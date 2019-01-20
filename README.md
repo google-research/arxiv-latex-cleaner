@@ -7,7 +7,7 @@ arXiv.
 ## Example call:
 
 ```
-python -m arxiv_latex_cleaner.arxiv_latex_cleaner /path/to/latex/ --im_size 500 --images_whitelist='{"images/im.png":2000}'
+python -m arxiv-latex-cleaner.arxiv_latex_cleaner /path/to/latex/ --im_size 500 --images_whitelist='{"images/im.png":2000}'
 ```
 
 ## Main features:
