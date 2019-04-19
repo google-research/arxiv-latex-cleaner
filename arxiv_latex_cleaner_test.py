@@ -97,8 +97,8 @@ class IntegrationTests(unittest.TestCase):
           '{:s} and {:s} are not equal.'.format(filename, filename_true))
 
   def test_complete(self):
-    out_path_true = path.join('test_data', 'tex_arXiv_true')
-    self.out_path = path.join('test_data', 'tex_arXiv')
+    out_path_true = 'tex_arXiv_true'
+    self.out_path = 'tex_arXiv'
 
     # Make sure the folder does not exist, since we erase it in the test.
     if path.isdir(self.out_path):
@@ -106,7 +106,7 @@ class IntegrationTests(unittest.TestCase):
           self.out_path))
 
     arxiv_latex_cleaner._run_arxiv_cleaner({
-        'input_folder': path.join('test_data', 'tex'),
+        'input_folder': 'tex',
         'images_whitelist': {
             'images/im2_included.jpg': 200
         },
