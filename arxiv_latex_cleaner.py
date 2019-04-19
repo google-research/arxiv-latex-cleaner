@@ -23,6 +23,31 @@ import shutil
 
 from PIL import Image
 
+# Even if '\' (os.sep) is the standard way of making paths on Windows,
+# it crashes with regular expressions. The proposal is just change os.sep to '/'
+# and os.path.join to a version using '/' as Windows will handle it
+# the right way (like in C with fopen, ...). The remaining code do not change.
+if os.name == 'nt':
+  #  On Windows systems
+  global old_sep
+  global old_os_path_join
+
+  # Create a new function to replace os.path.join
+  # Not optimum but performance is not an issue here
+  def new_os_join(path, *args):
+    res = old_os_path_join(path, *args)
+    res = res.replace('\\','/')
+    return res
+  
+  # Store previous value for both variable and function
+  old_os_sep = os.sep
+  old_os_path_join = os.path.join
+
+  # Back to '/' separator as Windows handle it the right way (like in C)
+  os.sep = '/'
+  # Replace call to os.path.join to the new define function
+  os.path.join = new_os_join
+
 
 def _create_dir_erase_if_exists(path):
   if os.path.exists(path):
