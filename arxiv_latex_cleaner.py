@@ -20,6 +20,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 
 from PIL import Image
 
@@ -125,7 +126,8 @@ def _read_remove_comments_and_write_file(filename, parameters):
 def _resize_and_copy_figure(filename,
                             origin_folder,
                             destination_folder,
-                            dest_size=600):
+                            dest_size=600,
+                            compress_pdf=False):
   """Copies a file while erasing all the LaTeX comments in its content."""
   _create_dir_if_not_exists(
       os.path.join(destination_folder, os.path.dirname(filename)))
@@ -140,10 +142,30 @@ def _resize_and_copy_figure(filename,
       im.save(os.path.join(destination_folder, filename), 'JPEG', quality=90)
     elif os.path.splitext(filename)[1].lower() in ['.png']:
       im.save(os.path.join(destination_folder, filename), 'PNG')
+  
+  elif compress_pdf and os.path.splitext(filename)[1].lower() in ['.pdf']:
+    _resize_pdf_figure(filename, origin_folder, destination_folder)
   else:
     shutil.copy(
         os.path.join(origin_folder, filename),
         os.path.join(destination_folder, filename))
+
+
+def _resize_pdf_figure(filename, origin_folder, destination_folder, timeout=10):
+  bashCommand = ('gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE '
+                 '-dQUIET -dBATCH -sOutputFile={} {}')
+  inputFile = os.path.join(origin_folder, filename)
+  outputFile = os.path.join(destination_folder, filename)
+  bashCommand = bashCommand.format(outputFile, inputFile)
+  process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
+
+  try:
+    outs, errs = process.communicate(timeout=timeout)
+  except subprocess.TimeoutExpired:
+    process.kill()
+    outs, errs = process.communicate()
+    print('Output: ',outs)
+    print('Errors: ', errs)
 
 
 def _resize_and_copy_figures(parameters, splits):
@@ -156,7 +178,8 @@ def _resize_and_copy_figures(parameters, splits):
         image_file,
         parameters['input_folder'],
         parameters['output_folder'],
-        dest_size=out_size[image_file])
+        dest_size=out_size[image_file],
+        compress_pdf=parameters['compress_pdf'])
 
 
 def _keep_only_referenced(filenames, container_files):
@@ -234,6 +257,11 @@ def _handle_arguments():
       help=('Images that won\'t be resized to the default resolution, but the '
             'one provided here in a dictionary as follows '
             '\'{"path/to/im.jpg": 1000}\''))
+  parser.add_argument(
+      '--compress_pdf',
+      action='store_true',
+      help=('Compress PDF images using ghostscript (Linux and Mac only).')
+  )
 
   return vars(parser.parse_args())
 
