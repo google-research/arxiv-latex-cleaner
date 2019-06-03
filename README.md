@@ -46,6 +46,9 @@ optional arguments:
                         Images that won't be resized to the default
                         resolution, but the one provided here in a dictionary
                         as follows '{"path/to/im.jpg": 1000}'
+  --compress_pdf        Compress PDF images using ghostscript (Linux and Mac
+                        only).
+
 ```
 
 ## Note
