@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Cleans the LaTeX code of your paper to submit to arXiv."""
 import argparse
 import collections
@@ -24,18 +23,21 @@ import subprocess
 
 from PIL import Image
 
-# Fix for Windows: Even if '\' (os.sep) is the standard way of making paths on 
+PDF_RESIZE_COMMAND = ('gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE '
+                      '-dQUIET -dBATCH -sOutputFile={} {}')
+
+# Fix for Windows: Even if '\' (os.sep) is the standard way of making paths on
 # Windows, it interferes with regular expressions. We just change os.sep to '/'
-# and os.path.join to a version using '/' as Windows will handle it the right 
+# and os.path.join to a version using '/' as Windows will handle it the right
 # way.
 if os.name == 'nt':
   global old_os_path_join
 
   def new_os_join(path, *args):
     res = old_os_path_join(path, *args)
-    res = res.replace('\\','/')
+    res = res.replace('\\', '/')
     return res
-  
+
   old_os_path_join = os.path.join
 
   os.sep = '/'
@@ -142,7 +144,7 @@ def _resize_and_copy_figure(filename,
       im.save(os.path.join(destination_folder, filename), 'JPEG', quality=90)
     elif os.path.splitext(filename)[1].lower() in ['.png']:
       im.save(os.path.join(destination_folder, filename), 'PNG')
-  
+
   elif compress_pdf and os.path.splitext(filename)[1].lower() in ['.pdf']:
     _resize_pdf_figure(filename, origin_folder, destination_folder)
   else:
@@ -152,19 +154,17 @@ def _resize_and_copy_figure(filename,
 
 
 def _resize_pdf_figure(filename, origin_folder, destination_folder, timeout=10):
-  bashCommand = ('gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE '
-                 '-dQUIET -dBATCH -sOutputFile={} {}')
-  inputFile = os.path.join(origin_folder, filename)
-  outputFile = os.path.join(destination_folder, filename)
-  bashCommand = bashCommand.format(outputFile, inputFile)
-  process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
+  input_file = os.path.join(origin_folder, filename)
+  output_file = os.path.join(destination_folder, filename)
+  bash_command = PDF_RESIZE_COMMAND.format(output_file, input_file)
+  process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
 
   try:
-    outs, errs = process.communicate(timeout=timeout)
+    process.communicate(timeout=timeout)
   except subprocess.TimeoutExpired:
     process.kill()
     outs, errs = process.communicate()
-    print('Output: ',outs)
+    print('Output: ', outs)
     print('Errors: ', errs)
 
 
@@ -260,8 +260,7 @@ def _handle_arguments():
   parser.add_argument(
       '--compress_pdf',
       action='store_true',
-      help=('Compress PDF images using ghostscript (Linux and Mac only).')
-  )
+      help='Compress PDF images using ghostscript (Linux and Mac only).')
 
   return vars(parser.parse_args())
 

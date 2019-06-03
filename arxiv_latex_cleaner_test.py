@@ -110,7 +110,8 @@ class IntegrationTests(unittest.TestCase):
         'images_whitelist': {
             'images/im2_included.jpg': 200
         },
-        'im_size': 100
+        'im_size': 100,
+        'compress_pdf': False
     })
 
     # Checks the set of files is the same as in the true folder.
