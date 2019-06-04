@@ -48,6 +48,9 @@ optional arguments:
                         as follows '{"path/to/im.jpg": 1000}'
   --compress_pdf        Compress PDF images using ghostscript (Linux and Mac
                         only).
+  --commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]
+                        LaTeX commands that will be deleted. Useful for e.g.
+                        user-defined \todo commands.
 
 ```
 
