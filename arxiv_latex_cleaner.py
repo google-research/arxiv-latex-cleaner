@@ -91,7 +91,19 @@ def _copy_file(filename, params):
       os.path.join(params['output_folder'], filename))
 
 
-def _remove_comments(text):
+def _remove_command(text, command):
+  """Removes '\\command{*}' from the string 'text'."""
+  return re.sub(r'\\' + command + r'\{[^{}]*\}', '', text)
+
+
+def _remove_environment(text, environment):
+  """Removes '\\begin{environment}*\\end{environment}' from 'text'."""
+  return re.sub(
+      r'\\begin\{' + environment + r'\}[^{}]*\\end\{' + environment + r'\}',
+      '', text)
+
+
+def _remove_comments_inline(text):
   """Removes the comments from the string 'text'."""
   if 'auto-ignore' in text:
     return text
@@ -120,8 +132,11 @@ def _read_remove_comments_and_write_file(filename, parameters):
       os.path.join(parameters['output_folder'], os.path.dirname(filename)))
   content = _read_file_content(
       os.path.join(parameters['input_folder'], filename))
-  content_out = [_remove_comments(line) for line in content]
-  _write_file_content(''.join(content_out),
+  content = [_remove_comments_inline(line) for line in content]
+  content = _remove_environment(''.join(content), 'comment')
+  for command in parameters['commands_to_delete']:
+    content = _remove_command(content, command)
+  _write_file_content(content,
                       os.path.join(parameters['output_folder'], filename))
 
 
@@ -261,6 +276,13 @@ def _handle_arguments():
       '--compress_pdf',
       action='store_true',
       help='Compress PDF images using ghostscript (Linux and Mac only).')
+  parser.add_argument(
+      '--commands_to_delete',
+      nargs='+',
+      default=[],
+      help=('LaTeX commands that will be deleted. Useful for e.g. user-defined '
+            '\\todo commands.'),
+      required=False)
 
   return vars(parser.parse_args())
 
