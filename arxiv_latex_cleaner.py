@@ -25,6 +25,7 @@ from PIL import Image
 
 PDF_RESIZE_COMMAND = ('gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE '
                       '-dQUIET -dBATCH -sOutputFile={} {}')
+MAX_FILENAME_LENGTH = 120
 
 # Fix for Windows: Even if '\' (os.sep) is the standard way of making paths on
 # Windows, it interferes with regular expressions. We just change os.sep to '/'
@@ -77,6 +78,7 @@ def _list_all_files(in_folder, ignore_dirs=None):
     ignore_dirs = []
   to_consider = [
       os.path.join(os.path.relpath(path, in_folder), name)
+      if path != in_folder else name
       for path, _, files in os.walk(in_folder)
       for name in files
   ]
@@ -99,8 +101,8 @@ def _remove_command(text, command):
 def _remove_environment(text, environment):
   """Removes '\\begin{environment}*\\end{environment}' from 'text'."""
   return re.sub(
-      r'\\begin\{' + environment + r'\}[^{}]*\\end\{' + environment + r'\}',
-      '', text)
+      r'\\begin\{' + environment + r'\}[^{}]*\\end\{' + environment + r'\}', '',
+      text)
 
 
 def _remove_comments_inline(text):
@@ -160,7 +162,7 @@ def _resize_and_copy_figure(filename,
     elif os.path.splitext(filename)[1].lower() in ['.png']:
       im.save(os.path.join(destination_folder, filename), 'PNG')
 
-  elif compress_pdf and os.path.splitext(filename)[1].lower() in ['.pdf']:
+  elif compress_pdf and os.path.splitext(filename)[1].lower() == '.pdf':
     _resize_pdf_figure(filename, origin_folder, destination_folder)
   else:
     shutil.copy(
@@ -181,6 +183,14 @@ def _resize_pdf_figure(filename, origin_folder, destination_folder, timeout=10):
     outs, errs = process.communicate()
     print('Output: ', outs)
     print('Errors: ', errs)
+
+
+def _copy_only_referenced_non_tex_not_in_root(parameters, splits):
+  for fn in _keep_only_referenced(
+      splits['non_tex_not_in_root_to_copy_if_referenced'],
+      [os.path.join(parameters['output_folder'], fn) for fn in splits['tex']]):
+
+    _copy_file(fn, parameters)
 
 
 def _resize_and_copy_figures(parameters, splits):
@@ -237,9 +247,10 @@ def _split_all_files(parameters):
   file_splits['tex'] = _keep_pattern(
       file_splits['to_copy_in_root'] + file_splits['to_copy_not_in_root'],
       ['.tex$'])
-  file_splits['non_tex'] = _remove_pattern(
-      file_splits['to_copy_in_root'] + file_splits['to_copy_not_in_root'],
-      ['.tex$'])
+  file_splits['non_tex_in_root'] = _remove_pattern(
+      file_splits['to_copy_in_root'], ['.tex$'])
+  file_splits['non_tex_not_in_root_to_copy_if_referenced'] = _remove_pattern(
+      file_splits['to_copy_not_in_root'], ['.tex$'])
 
   return file_splits
 
@@ -291,8 +302,9 @@ def _run_arxiv_cleaner(parameters):
   """Core of the code, runs the actual arXiv cleaner."""
   parameters.update({
       'to_delete_in_root': [
-          '.aux$', '.sh$', '.bib$', '.blg$', '.log$', '.out$', '.ps$', '.dvi$',
-          '.synctex.gz$', '~$', '.backup$', '.gitignore$', '.DS_Store$', '.svg$'
+          '.aux$', '.sh$', '.bib$', '.blg$', '.brf$', '.log$', '.out$', '.ps$',
+          '.dvi$', '.synctex.gz$', '~$', '.backup$', '.gitignore$',
+          '.DS_Store$', '.svg$', '^.idea'
       ],
       'to_delete_not_in_root': ['.DS_Store$', '.gitignore$', '.svg$'],
       'figures_to_copy_if_referenced': ['.png$', '.jpg$', '.jpeg$', '.pdf$']
@@ -302,11 +314,12 @@ def _run_arxiv_cleaner(parameters):
 
   parameters['output_folder'] = _create_out_folder(parameters['input_folder'])
 
-  for non_tex_file in splits['non_tex']:
+  for non_tex_file in splits['non_tex_in_root']:
     _copy_file(non_tex_file, parameters)
   for tex_file in splits['tex']:
     _read_remove_comments_and_write_file(tex_file, parameters)
 
+  _copy_only_referenced_non_tex_not_in_root(parameters, splits)
   _resize_and_copy_figures(parameters, splits)
 
 
