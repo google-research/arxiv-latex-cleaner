@@ -186,19 +186,21 @@ def _resize_pdf_figure(filename, origin_folder, destination_folder, timeout=10):
 
 
 def _copy_only_referenced_non_tex_not_in_root(parameters, splits):
-  for fn in _keep_only_referenced(
-      splits['non_tex_not_in_root_to_copy_if_referenced'],
-      [os.path.join(parameters['output_folder'], fn) for fn in splits['tex']]):
+  for fn in _keep_only_referenced(splits['non_tex_not_in_root'], [
+      os.path.join(parameters['output_folder'], fn)
+      for fn in splits['tex_to_copy']
+  ]):
 
     _copy_file(fn, parameters)
 
 
-def _resize_and_copy_figures(parameters, splits):
+def _resize_and_copy_figures_if_referenced(parameters, splits):
   out_size = collections.defaultdict(lambda: parameters['im_size'])
   out_size.update(parameters['images_whitelist'])
-  for image_file in _keep_only_referenced(
-      splits['figures'],
-      [os.path.join(parameters['output_folder'], fn) for fn in splits['tex']]):
+  for image_file in _keep_only_referenced(splits['figures'], [
+      os.path.join(parameters['output_folder'], fn)
+      for fn in splits['tex_to_copy']
+  ]):
     _resize_and_copy_figure(
         image_file,
         parameters['input_folder'],
@@ -221,6 +223,31 @@ def _keep_only_referenced(filenames, container_files):
   return referenced
 
 
+def _keep_only_referenced_tex(parameters, splits):
+  """Returns the filenames referenced from the tex files themselves
+
+  It needs various iterations in case one file is referenced from an
+  unreferenced file.
+  """
+  contents = {}
+  for fn in splits['tex_in_root'] + splits['tex_not_in_root']:
+    with open(os.path.join(parameters['input_folder'], fn), 'r') as fp:
+      contents[fn] = fp.read()
+
+  old_referenced = set(splits['tex_in_root'] + splits['tex_not_in_root'])
+  while True:
+    referenced = set(splits['tex_in_root'])
+    for fn in old_referenced:
+      for fn2 in old_referenced:
+        if re.search(r'(' + os.path.splitext(fn)[0] + r'[.}])', contents[fn2]):
+          referenced.add(fn)
+
+    if referenced == old_referenced:
+      return list(referenced)
+
+    old_referenced = referenced.copy()
+
+
 def _split_all_files(parameters):
   """Splits the files into types or location to know what to do with them."""
   file_splits = {
@@ -232,24 +259,37 @@ def _split_all_files(parameters):
           if os.path.isfile(os.path.join(parameters['input_folder'], f))
       ]
   }
+
   file_splits['not_in_root'] = [
       f for f in file_splits['all'] if f not in file_splits['in_root']
   ]
   file_splits['to_copy_in_root'] = _remove_pattern(
-      file_splits['in_root'], parameters['to_delete_in_root'] +
-      parameters['figures_to_copy_if_referenced'])
+      file_splits['in_root'],
+      parameters['to_delete'] + parameters['figures_to_copy_if_referenced'])
   file_splits['to_copy_not_in_root'] = _remove_pattern(
-      file_splits['not_in_root'], parameters['to_delete_in_root'] +
-      parameters['figures_to_copy_if_referenced'])
+      file_splits['not_in_root'],
+      parameters['to_delete'] + parameters['figures_to_copy_if_referenced'])
   file_splits['figures'] = _keep_pattern(
       file_splits['all'], parameters['figures_to_copy_if_referenced'])
 
-  file_splits['tex'] = _keep_pattern(
-      file_splits['to_copy_in_root'] + file_splits['to_copy_not_in_root'],
-      ['.tex$'])
+  file_splits['tex_in_root'] = _keep_pattern(file_splits['to_copy_in_root'],
+                                             ['.tex$'])
+  file_splits['tex_not_in_root'] = _keep_pattern(
+      file_splits['to_copy_not_in_root'], ['.tex$'])
+  file_splits['tex_to_copy'] = _keep_only_referenced_tex(
+      parameters, file_splits)
+
+  # TODO: Check auto-ignore in root to detect the main file. Then check there is
+  # only one non-referenced TeX in root.
+
+  # Forces the TeX in root to be copied.
+  for fn in file_splits['tex_in_root']:
+    if fn not in file_splits['tex_to_copy']:
+      file_splits['tex_to_copy'].append(fn)
+
   file_splits['non_tex_in_root'] = _remove_pattern(
       file_splits['to_copy_in_root'], ['.tex$'])
-  file_splits['non_tex_not_in_root_to_copy_if_referenced'] = _remove_pattern(
+  file_splits['non_tex_not_in_root'] = _remove_pattern(
       file_splits['to_copy_not_in_root'], ['.tex$'])
 
   return file_splits
@@ -301,12 +341,11 @@ def _handle_arguments():
 def _run_arxiv_cleaner(parameters):
   """Core of the code, runs the actual arXiv cleaner."""
   parameters.update({
-      'to_delete_in_root': [
+      'to_delete': [
           '.aux$', '.sh$', '.bib$', '.blg$', '.brf$', '.log$', '.out$', '.ps$',
           '.dvi$', '.synctex.gz$', '~$', '.backup$', '.gitignore$',
           '.DS_Store$', '.svg$', '^.idea'
       ],
-      'to_delete_not_in_root': ['.DS_Store$', '.gitignore$', '.svg$'],
       'figures_to_copy_if_referenced': ['.png$', '.jpg$', '.jpeg$', '.pdf$']
   })
 
@@ -314,13 +353,14 @@ def _run_arxiv_cleaner(parameters):
 
   parameters['output_folder'] = _create_out_folder(parameters['input_folder'])
 
-  for non_tex_file in splits['non_tex_in_root']:
-    _copy_file(non_tex_file, parameters)
-  for tex_file in splits['tex']:
+  for tex_file in splits['tex_to_copy']:
     _read_remove_comments_and_write_file(tex_file, parameters)
 
   _copy_only_referenced_non_tex_not_in_root(parameters, splits)
-  _resize_and_copy_figures(parameters, splits)
+  for non_tex_file in splits['non_tex_in_root']:
+    _copy_file(non_tex_file, parameters)
+
+  _resize_and_copy_figures_if_referenced(parameters, splits)
 
 
 def main():
