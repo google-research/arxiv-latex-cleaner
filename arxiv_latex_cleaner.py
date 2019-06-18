@@ -105,7 +105,7 @@ def _remove_command(text, command):
 def _remove_environment(text, environment):
   """Removes '\\begin{environment}*\\end{environment}' from 'text'."""
   return re.sub(
-      r'\\begin\{' + environment + r'\}[\s\S]*\\end\{' + environment + r'\}', '',
+      r'\\begin\{' + environment + r'\}[\s\S]*?\\end\{' + environment + r'\}', '',
       text)
 
 
@@ -117,7 +117,7 @@ def _remove_comments_inline(text):
     return ''
   match = re.search(r'(?<!\\)%', text)
   if match:
-    return text[:match.end()] + '\n'
+    return text[:match.end()-1] + '\n'
   else:
     return text
 
