@@ -95,13 +95,17 @@ def _copy_file(filename, params):
 
 def _remove_command(text, command):
   """Removes '\\command{*}' from the string 'text'."""
-  return re.sub(r'\\' + command + r'\{[^{}]*\}', '', text)
+  """
+  Regex expression used to match balanced parentheses taken from:
+    https://stackoverflow.com/questions/546433/regular-expression-to-match-balanced-parentheses/35271017#35271017
+  """
+  return re.sub(r'\\' + command + r'\{(?:[^}{]+|\{(?:[^}{]+|\{[^}{]*\})*\})*\}', '', text)
 
 
 def _remove_environment(text, environment):
   """Removes '\\begin{environment}*\\end{environment}' from 'text'."""
   return re.sub(
-      r'\\begin\{' + environment + r'\}[^{}]*\\end\{' + environment + r'\}', '',
+      r'\\begin\{' + environment + r'\}[\s\S]*\\end\{' + environment + r'\}', '',
       text)
 
 
@@ -109,7 +113,7 @@ def _remove_comments_inline(text):
   """Removes the comments from the string 'text'."""
   if 'auto-ignore' in text:
     return text
-  if text.lstrip(' ').startswith('%'):
+  if text.lstrip(' ').lstrip('\t').startswith('%'):
     return ''
   match = re.search(r'(?<!\\)%', text)
   if match:
@@ -134,6 +138,7 @@ def _read_remove_comments_and_write_file(filename, parameters):
       os.path.join(parameters['output_folder'], os.path.dirname(filename)))
   content = _read_file_content(
       os.path.join(parameters['input_folder'], filename))
+  print("File " + filename + " processed")
   content = [_remove_comments_inline(line) for line in content]
   content = _remove_environment(''.join(content), 'comment')
   for command in parameters['commands_to_delete']:
