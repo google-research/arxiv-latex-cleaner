@@ -153,7 +153,7 @@ def _resize_and_copy_figure(filename,
                             destination_folder,
                             dest_size=600,
                             compress_pdf=False):
-  """Copies a file while erasing all the LaTeX comments in its content."""
+  """Resizes and copies the input figure (either JPG, PNG, or PDF)."""
   _create_dir_if_not_exists(
       os.path.join(destination_folder, os.path.dirname(filename)))
 
