@@ -309,42 +309,7 @@ def _create_out_folder(input_folder):
   return out_folder
 
 
-def _handle_arguments():
-  """Defines and returns the arguments."""
-  parser = argparse.ArgumentParser(
-      description=('Clean the LaTeX code of your paper to submit to arXiv. '
-                   'Check the README for more information on the use.'))
-  parser.add_argument(
-      'input_folder', type=str, help='Input folder containing the LaTeX code.')
-  parser.add_argument(
-      '--im_size',
-      default=500,
-      type=int,
-      help=('Size of the output images (in pixels, longest side). Fine tune '
-            'this to get as close to 10MB as possible.'))
-  parser.add_argument(
-      '--images_whitelist',
-      default={},
-      type=json.loads,
-      help=('Images that won\'t be resized to the default resolution, but the '
-            'one provided here in a dictionary as follows '
-            '\'{"path/to/im.jpg": 1000}\''))
-  parser.add_argument(
-      '--compress_pdf',
-      action='store_true',
-      help='Compress PDF images using ghostscript (Linux and Mac only).')
-  parser.add_argument(
-      '--commands_to_delete',
-      nargs='+',
-      default=[],
-      help=('LaTeX commands that will be deleted. Useful for e.g. user-defined '
-            '\\todo commands.'),
-      required=False)
-
-  return vars(parser.parse_args())
-
-
-def _run_arxiv_cleaner(parameters):
+def run_arxiv_cleaner(parameters):
   """Core of the code, runs the actual arXiv cleaner."""
   parameters.update({
       'to_delete': [
@@ -367,12 +332,3 @@ def _run_arxiv_cleaner(parameters):
     _copy_file(non_tex_file, parameters)
 
   _resize_and_copy_figures_if_referenced(parameters, splits)
-
-
-def main():
-  command_line_parameters = _handle_arguments()
-  _run_arxiv_cleaner(command_line_parameters)
-
-
-if __name__ == '__main__':
-  main()

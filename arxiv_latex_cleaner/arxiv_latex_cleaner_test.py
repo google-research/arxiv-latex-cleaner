@@ -146,7 +146,7 @@ class IntegrationTests(unittest.TestCase):
       raise RuntimeError('The folder {:s} should not exist.'.format(
           self.out_path))
 
-    arxiv_latex_cleaner._run_arxiv_cleaner({
+    arxiv_latex_cleaner.run_arxiv_cleaner({
         'input_folder': 'tex',
         'images_whitelist': {
             'images/im2_included.jpg': 200
