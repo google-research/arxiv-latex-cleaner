@@ -73,7 +73,7 @@ PARSER.add_argument(
     default=[],
     required=False,
     help=(
-        "LaTeX commands that will be deleted. Useful for e.g. user-defined"
+        "LaTeX commands that will be deleted. Useful for e.g. user-defined "
         "\\todo commands."
     ),
 )
