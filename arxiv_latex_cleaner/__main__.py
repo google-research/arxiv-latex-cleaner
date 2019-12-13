@@ -80,3 +80,4 @@ PARSER.add_argument(
 
 ARGS = vars(PARSER.parse_args())
 run_arxiv_cleaner(ARGS)
+exit(0)
