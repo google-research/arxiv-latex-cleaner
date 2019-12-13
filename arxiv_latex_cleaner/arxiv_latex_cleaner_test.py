@@ -19,7 +19,7 @@ import shutil
 import unittest
 from absl.testing import parameterized
 
-import arxiv_latex_cleaner
+from arxiv_latex_cleaner import arxiv_latex_cleaner
 from PIL import Image
 
 
