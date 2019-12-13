@@ -99,14 +99,14 @@ def _remove_command(text, command):
   Regex expression used to match balanced parentheses taken from:
   https://stackoverflow.com/questions/546433/regular-expression-to-match-balanced-parentheses/35271017#35271017
   """
-  return re.sub(r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}',
+  return re.sub(r'\\' + command + r'\{(?:[^}{]+|\{(?:[^}{]+|\{[^}{]*\})*\})*\}',
                 '', text)
 
 
 def _remove_environment(text, environment):
   """Removes '\\begin{environment}*\\end{environment}' from 'text'."""
   return re.sub(
-      r'\\begin{' + environment + r'}[\s\S]*?\\end{' + environment + r'}',
+      r'\\begin\{' + environment + r'\}[\s\S]*?\\end\{' + environment + r'\}',
       '', text)
 
 
@@ -153,7 +153,7 @@ def _resize_and_copy_figure(filename,
                             destination_folder,
                             dest_size=600,
                             compress_pdf=False):
-  """Resizes and copies the input figure (either JPG, PNG, or PDF)."""
+  """Copies a file while erasing all the LaTeX comments in its content."""
   _create_dir_if_not_exists(
       os.path.join(destination_folder, os.path.dirname(filename)))
 
