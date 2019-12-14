@@ -1,3 +1,5 @@
+# `arxiv_latex_cleaner`
+
 This tool allows you to easily clean the LaTeX code of your paper to submit to
 arXiv. From a folder containing all your code, e.g. `/path/to/latex/`, it
 creates a new folder `/path/to/latex_arXiv/`, that is ready to ZIP and upload to
@@ -5,8 +7,22 @@ arXiv.
 
 ## Example call:
 
+```console
+python -m arxiv_latex_cleaner /path/to/latex --im_size 500 --images_whitelist='{"images/im.png":2000}'
 ```
-python -m arxiv-latex-cleaner.arxiv_latex_cleaner /path/to/latex/ --im_size 500 --images_whitelist='{"images/im.png":2000}'
+
+## Setup:
+
+```console
+git clone https://github.com/google-research/arxiv-latex-cleaner
+cd arxiv-latex-cleaner/
+```
+
+Optionally, this may be installed and used as a command-line program:
+
+```console
+python setup.py install
+arxiv_latex_cleaner --help
 ```
 
 ## Main features:
@@ -36,9 +52,14 @@ There is a 10MB limit on arXiv submissions, so to make it fit:
 ## Usage:
 
 ```
-arxiv_latex_cleaner.py [-h] [--im_size IM_SIZE]
-                       [--images_whitelist IMAGES_WHITELIST]
-                       input_folder
+usage: arxiv_latex_cleaner@v0.1.0 [-h] [--im_size IM_SIZE]
+                                  [--images_whitelist IMAGES_WHITELIST]
+                                  [--compress_pdf]
+                                  [--commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]]
+                                  input_folder
+
+Clean the LaTeX code of your paper to submit to arXiv. Check the README for
+more information on the use.
 
 positional arguments:
   input_folder          Input folder containing the LaTeX code.
