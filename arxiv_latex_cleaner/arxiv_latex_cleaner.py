@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Cleans the LaTeX code of your paper to submit to arXiv."""
-import argparse
 import collections
-import json
 import os
 import re
 import shutil
@@ -34,10 +32,12 @@ MAX_FILENAME_LENGTH = 120
 if os.name == 'nt':
   global old_os_path_join
 
+
   def new_os_join(path, *args):
     res = old_os_path_join(path, *args)
     res = res.replace('\\', '/')
     return res
+
 
   old_os_path_join = os.path.join
 
@@ -128,31 +128,36 @@ def _read_file_content(filename):
     return fp.readlines()
 
 
+def _read_all_tex_contents(tex_files, parameters):
+  contents = {}
+  for fn in tex_files:
+    contents[fn] = _read_file_content(
+        os.path.join(parameters['input_folder'], fn))
+  return contents
+
+
 def _write_file_content(content, filename):
+  _create_dir_if_not_exists(os.path.dirname(filename))
   with open(filename, 'w') as fp:
     return fp.write(content)
 
 
-def _read_remove_comments_and_write_file(filename, parameters):
-  """Reads a file, erases all LaTeX comments in the content, and writes it."""
-  _create_dir_if_not_exists(
-      os.path.join(parameters['output_folder'], os.path.dirname(filename)))
-  content = _read_file_content(
-      os.path.join(parameters['input_folder'], filename))
-  print('File ' + filename + ' processed')
+def _remove_comments(content, parameters):
+  """Erases all LaTeX comments in the content, and writes it."""
   content = [_remove_comments_inline(line) for line in content]
   content = _remove_environment(''.join(content), 'comment')
   for command in parameters['commands_to_delete']:
     content = _remove_command(content, command)
-  _write_file_content(content,
-                      os.path.join(parameters['output_folder'], filename))
+  # If file ends with '\n' already, the split in last line would add an extra
+  # '\n', so we remove it.
+  return content.split('\n')
 
 
 def _resize_and_copy_figure(filename,
-                            origin_folder,
-                            destination_folder,
-                            dest_size=600,
-                            compress_pdf=False):
+    origin_folder,
+    destination_folder,
+    dest_size=600,
+    compress_pdf=False):
   """Resizes and copies the input figure (either JPG, PNG, or PDF)."""
   _create_dir_if_not_exists(
       os.path.join(destination_folder, os.path.dirname(filename)))
@@ -191,22 +196,15 @@ def _resize_pdf_figure(filename, origin_folder, destination_folder, timeout=10):
     print('Errors: ', errs)
 
 
-def _copy_only_referenced_non_tex_not_in_root(parameters, splits):
-  for fn in _keep_only_referenced(splits['non_tex_not_in_root'], [
-      os.path.join(parameters['output_folder'], fn)
-      for fn in splits['tex_to_copy']
-  ]):
-
+def _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits):
+  for fn in _keep_only_referenced(splits['non_tex_not_in_root'], contents):
     _copy_file(fn, parameters)
 
 
-def _resize_and_copy_figures_if_referenced(parameters, splits):
+def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
   out_size = collections.defaultdict(lambda: parameters['im_size'])
   out_size.update(parameters['images_whitelist'])
-  for image_file in _keep_only_referenced(splits['figures'], [
-      os.path.join(parameters['output_folder'], fn)
-      for fn in splits['tex_to_copy']
-  ]):
+  for image_file in _keep_only_referenced(splits['figures'], contents):
     _resize_and_copy_figure(
         image_file,
         parameters['input_folder'],
@@ -215,51 +213,49 @@ def _resize_and_copy_figures_if_referenced(parameters, splits):
         compress_pdf=parameters['compress_pdf'])
 
 
-def _keep_only_referenced(filenames, container_files):
-  """Returns the filenames referenced from the content of container_files."""
-  referenced = set()
-  for container in container_files:
-    with open(container, 'r') as fp:
-      data = fp.read()
-
-    for fn in filenames:
-      if os.path.splitext(fn)[0] in data:
-        referenced.add(fn)
-
-  return referenced
+def _keep_only_referenced(filenames, contents):
+  """Returns the filenames referenced from contents."""
+  return [fn for fn in filenames if os.path.splitext(fn)[0] in contents]
 
 
-def _keep_only_referenced_tex(parameters, splits):
+def _keep_only_referenced_tex(contents, splits):
   """Returns the filenames referenced from the tex files themselves
 
   It needs various iterations in case one file is referenced from an
   unreferenced file.
   """
-  contents = {}
-  for fn in splits['tex_in_root'] + splits['tex_not_in_root']:
-    with open(os.path.join(parameters['input_folder'], fn), 'r') as fp:
-      contents[fn] = fp.read()
-
   old_referenced = set(splits['tex_in_root'] + splits['tex_not_in_root'])
   while True:
     referenced = set(splits['tex_in_root'])
     for fn in old_referenced:
       for fn2 in old_referenced:
-        if re.search(r'(' + os.path.splitext(fn)[0] + r'[.}])', contents[fn2]):
+        if re.search(r'(' + os.path.splitext(fn)[0] + r'[.}])',
+                     '\n'.join(contents[fn2])):
           referenced.add(fn)
 
     if referenced == old_referenced:
-      return list(referenced)
+      splits['tex_to_copy'] = list(referenced)
+      return
 
     old_referenced = referenced.copy()
+
+
+def _add_root_tex_files(splits):
+  # TODO: Check auto-ignore marker in root to detect the main file. Then check
+  #  there is only one non-referenced TeX in root.
+
+  # Forces the TeX in root to be copied, even if they are not referenced.
+  for fn in splits['tex_in_root']:
+    if fn not in splits['tex_to_copy']:
+      splits['tex_to_copy'].append(fn)
 
 
 def _split_all_files(parameters):
   """Splits the files into types or location to know what to do with them."""
   file_splits = {
       'all':
-          _list_all_files(
-              parameters['input_folder'], ignore_dirs=['.git' + os.sep]),
+        _list_all_files(
+            parameters['input_folder'], ignore_dirs=['.git' + os.sep]),
       'in_root': [
           f for f in os.listdir(parameters['input_folder'])
           if os.path.isfile(os.path.join(parameters['input_folder'], f))
@@ -282,16 +278,6 @@ def _split_all_files(parameters):
                                              ['.tex$'])
   file_splits['tex_not_in_root'] = _keep_pattern(
       file_splits['to_copy_not_in_root'], ['.tex$'])
-  file_splits['tex_to_copy'] = _keep_only_referenced_tex(
-      parameters, file_splits)
-
-  # TODO: Check auto-ignore in root to detect the main file. Then check there is
-  # only one non-referenced TeX in root.
-
-  # Forces the TeX in root to be copied.
-  for fn in file_splits['tex_in_root']:
-    if fn not in file_splits['tex_to_copy']:
-      file_splits['tex_to_copy'].append(fn)
 
   file_splits['non_tex_in_root'] = _remove_pattern(
       file_splits['to_copy_in_root'], ['.tex$'])
@@ -320,15 +306,28 @@ def run_arxiv_cleaner(parameters):
       'figures_to_copy_if_referenced': ['.png$', '.jpg$', '.jpeg$', '.pdf$']
   })
 
-  splits = _split_all_files(parameters)
-
   parameters['output_folder'] = _create_out_folder(parameters['input_folder'])
 
-  for tex_file in splits['tex_to_copy']:
-    _read_remove_comments_and_write_file(tex_file, parameters)
+  splits = _split_all_files(parameters)
 
-  _copy_only_referenced_non_tex_not_in_root(parameters, splits)
+  tex_contents = _read_all_tex_contents(
+      splits['tex_in_root'] + splits['tex_not_in_root'], parameters)
+
+  for tex_file in tex_contents:
+    tex_contents[tex_file] = _remove_comments(tex_contents[tex_file],
+                                              parameters)
+
+  _keep_only_referenced_tex(tex_contents, splits)
+  _add_root_tex_files(splits)
+
+  for tex_file in splits['tex_to_copy']:
+    _write_file_content('\n'.join(tex_contents[tex_file]),
+                        os.path.join(parameters['output_folder'], tex_file))
+
+  full_content = '\n'.join(''.join(tex_contents[fn]) for fn in
+                           splits['tex_to_copy'])
+  _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
   for non_tex_file in splits['non_tex_in_root']:
     _copy_file(non_tex_file, parameters)
 
-  _resize_and_copy_figures_if_referenced(parameters, splits)
+  _resize_and_copy_figures_if_referenced(parameters, full_content, splits)

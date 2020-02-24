@@ -1,3 +1,8 @@
 *.pyc
-arxiv-latex-cleaner-public.iml
 .idea
+arxiv-latex-cleaner.iml
+arxiv-latex-cleaner.ipr
+arxiv-latex-cleaner.iws
+arxiv_latex_cleaner.egg-info/
+build/
+dist/
