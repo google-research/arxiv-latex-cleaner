@@ -151,8 +151,10 @@ class IntegrationTests(unittest.TestCase):
         'images_whitelist': {
             'images/im2_included.jpg': 200
         },
+        'resize_images': True,
         'im_size': 100,
         'compress_pdf': False,
+        'pdf_im_resolution': 500,
         'commands_to_delete': ['mytodo']
     })
 

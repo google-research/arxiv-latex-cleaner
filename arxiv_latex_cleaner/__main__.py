@@ -27,13 +27,10 @@ from .arxiv_latex_cleaner import run_arxiv_cleaner
 import argparse
 import json
 
-
 PARSER = argparse.ArgumentParser(
     prog="arxiv_latex_cleaner@{0}".format(__version__),
-    description=(
-        "Clean the LaTeX code of your paper to submit to arXiv. "
-        "Check the README for more information on the use."
-    ),
+    description=("Clean the LaTeX code of your paper to submit to arXiv. "
+                 "Check the README for more information on the use."),
 )
 
 PARSER.add_argument(
@@ -41,24 +38,17 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
-    "--im_size",
-    default=500,
-    type=int,
-    help=(
-        "Size of the output images (in pixels, longest side). Fine tune this "
-        "to get as close to 10MB as possible."
-    ),
+    "--resize_images",
+    action="store_true",
+    help="Resize images.",
 )
 
 PARSER.add_argument(
-    "--images_whitelist",
-    default={},
-    type=json.loads,
-    help=(
-        "Images that won't be resized to the default resolution, but the one "
-        "provided here in a dictionary as follows "
-        "'{\"path/to/im.jpg\": 1000}'"
-    ),
+    "--im_size",
+    default=500,
+    type=int,
+    help=("Size of the output images (in pixels, longest side). Fine tune this "
+          "to get as close to 10MB as possible."),
 )
 
 PARSER.add_argument(
@@ -68,14 +58,29 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--pdf_im_resolution",
+    default=500,
+    type=int,
+    help="Resolution (in dpi) to which the tool resamples the PDF images.",
+)
+
+PARSER.add_argument(
+    "--images_whitelist",
+    default={},
+    type=json.loads,
+    help=("Images (and PDFs) that won't be resized to the default resolution,"
+          "but the one provided here. Value is pixel for images, and dpi for"
+          "PDFs, as in --im_size and --pdf_im_resolution, respectively. Format "
+          "is a dictionary as: '{\"path/to/im.jpg\": 1000}'"),
+)
+
+PARSER.add_argument(
     "--commands_to_delete",
     nargs="+",
     default=[],
     required=False,
-    help=(
-        "LaTeX commands that will be deleted. Useful for e.g. user-defined "
-        "\\todo commands."
-    ),
+    help=("LaTeX commands that will be deleted. Useful for e.g. user-defined "
+          "\\todo commands."),
 )
 
 ARGS = vars(PARSER.parse_args())

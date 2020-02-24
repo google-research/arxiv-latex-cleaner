@@ -21,8 +21,10 @@ import subprocess
 
 from PIL import Image
 
-PDF_RESIZE_COMMAND = ('gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE '
-                      '-dQUIET -dBATCH -sOutputFile={} {}')
+PDF_RESIZE_COMMAND = (
+    'gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH '
+    '-dDownsampleColorImages=true -dColorImageResolution={resolution} '
+    '-dColorImageDownsampleThreshold=1.0 -sOutputFile={output} {input}')
 MAX_FILENAME_LENGTH = 120
 
 # Fix for Windows: Even if '\' (os.sep) is the standard way of making paths on
@@ -156,17 +158,21 @@ def _remove_comments(content, parameters):
 def _resize_and_copy_figure(filename,
     origin_folder,
     destination_folder,
-    dest_size=600,
-    compress_pdf=False):
+    resize_image,
+    image_size,
+    compress_pdf,
+    pdf_resolution):
   """Resizes and copies the input figure (either JPG, PNG, or PDF)."""
   _create_dir_if_not_exists(
       os.path.join(destination_folder, os.path.dirname(filename)))
 
-  if os.path.splitext(filename)[1].lower() in ['.jpg', '.jpeg', '.png']:
+  if resize_image and os.path.splitext(filename)[1].lower() in ['.jpg',
+                                                                '.jpeg',
+                                                                '.png']:
     im = Image.open(os.path.join(origin_folder, filename))
-    if max(im.size) > dest_size:
+    if max(im.size) > image_size:
       im = im.resize(
-          tuple([int(x * float(dest_size) / max(im.size)) for x in im.size]),
+          tuple([int(x * float(image_size) / max(im.size)) for x in im.size]),
           Image.ANTIALIAS)
     if os.path.splitext(filename)[1].lower() in ['.jpg', '.jpeg']:
       im.save(os.path.join(destination_folder, filename), 'JPEG', quality=90)
@@ -174,17 +180,20 @@ def _resize_and_copy_figure(filename,
       im.save(os.path.join(destination_folder, filename), 'PNG')
 
   elif compress_pdf and os.path.splitext(filename)[1].lower() == '.pdf':
-    _resize_pdf_figure(filename, origin_folder, destination_folder)
+    _resize_pdf_figure(filename, origin_folder, destination_folder,
+                       pdf_resolution)
   else:
     shutil.copy(
         os.path.join(origin_folder, filename),
         os.path.join(destination_folder, filename))
 
 
-def _resize_pdf_figure(filename, origin_folder, destination_folder, timeout=10):
+def _resize_pdf_figure(filename, origin_folder, destination_folder, resolution,
+    timeout=10):
   input_file = os.path.join(origin_folder, filename)
   output_file = os.path.join(destination_folder, filename)
-  bash_command = PDF_RESIZE_COMMAND.format(output_file, input_file)
+  bash_command = PDF_RESIZE_COMMAND.format(input=input_file, output=output_file,
+                                           resolution=resolution)
   process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
 
   try:
@@ -202,15 +211,21 @@ def _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits):
 
 
 def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
-  out_size = collections.defaultdict(lambda: parameters['im_size'])
-  out_size.update(parameters['images_whitelist'])
+  image_size = collections.defaultdict(lambda: parameters['im_size'])
+  image_size.update(parameters['images_whitelist'])
+  pdf_resolution = collections.defaultdict(
+      lambda: parameters['pdf_im_resolution'])
+  pdf_resolution.update(parameters['images_whitelist'])
   for image_file in _keep_only_referenced(splits['figures'], contents):
     _resize_and_copy_figure(
-        image_file,
-        parameters['input_folder'],
-        parameters['output_folder'],
-        dest_size=out_size[image_file],
-        compress_pdf=parameters['compress_pdf'])
+        filename=image_file,
+        origin_folder=parameters['input_folder'],
+        destination_folder=parameters['output_folder'],
+        resize_image=parameters['resize_images'],
+        image_size=image_size[image_file],
+        compress_pdf=parameters['compress_pdf'],
+        pdf_resolution=pdf_resolution[image_file]
+    )
 
 
 def _keep_only_referenced(filenames, contents):
