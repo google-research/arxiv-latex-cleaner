@@ -24,7 +24,8 @@ from PIL import Image
 PDF_RESIZE_COMMAND = (
     'gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH '
     '-dDownsampleColorImages=true -dColorImageResolution={resolution} '
-    '-dColorImageDownsampleThreshold=1.0 -sOutputFile={output} {input}')
+    '-dColorImageDownsampleThreshold=1.0 -sOutputFile={output} {input} '
+    '-dAutoRotatePages=/None')
 MAX_FILENAME_LENGTH = 120
 
 # Fix for Windows: Even if '\' (os.sep) is the standard way of making paths on
