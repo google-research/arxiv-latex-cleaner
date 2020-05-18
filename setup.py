@@ -17,9 +17,11 @@ from setuptools import setup
 from setuptools import find_packages
 from os import path
 
-# Get __version__ from _meta.py
 with open(path.join("arxiv_latex_cleaner", "_version.py")) as _fh:
     exec(_fh.read())
+
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 setup(
     name="arxiv_latex_cleaner",
@@ -30,6 +32,8 @@ setup(
     author="Google Research Authors",
     author_email="jponttuset@gmail.com",
     description="Cleans the LaTeX code of your paper to submit to arXiv.",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     entry_points={
         "console_scripts": ["arxiv_latex_cleaner=arxiv_latex_cleaner.__main__:__main__"]
     },
