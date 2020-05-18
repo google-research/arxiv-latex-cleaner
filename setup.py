@@ -31,7 +31,7 @@ setup(
     author_email="jponttuset@gmail.com",
     description="Cleans the LaTeX code of your paper to submit to arXiv.",
     entry_points={
-        "console_scripts": ["arxiv_latex_cleaner=arxiv_latex_cleaner.__main__"]
+        "console_scripts": ["arxiv_latex_cleaner=arxiv_latex_cleaner.__main__:__main__"]
     },
     install_requires=["absl_py", "Pillow"],
     classifiers=[
