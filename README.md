@@ -8,21 +8,27 @@ arXiv.
 ## Example call:
 
 ```console
-python -m arxiv_latex_cleaner /path/to/latex --im_size 500 --images_whitelist='{"images/im.png":2000}'
+arxiv_latex_cleaner /path/to/latex --im_size 500 --images_whitelist='{"images/im.png":2000}'
 ```
 
-## Setup:
+## Installation:
+
+```console
+pip install arxiv-latex-cleaner
+```
+
+Alternatively, you can download the source code:
 
 ```console
 git clone https://github.com/google-research/arxiv-latex-cleaner
 cd arxiv-latex-cleaner/
+python -m arxiv_latex_cleaner --help
 ```
 
-Optionally, this may be installed and used as a command-line program:
+And install as a command-line program directly from the source code:
 
 ```console
 python setup.py install
-arxiv_latex_cleaner --help
 ```
 
 ## Main features:
