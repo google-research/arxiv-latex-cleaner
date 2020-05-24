@@ -32,7 +32,7 @@ with open("requirements.txt") as f:
             install_requires.append(l_c)
 
 setup(
-    name="test-arxiv_latex_cleaner",
+    name="arxiv_latex_cleaner",
     version=__version__,
     packages=find_packages(exclude=["*.tests"]),
     url="https://github.com/google-research/arxiv-latex-cleaner",
