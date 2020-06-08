@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+#
 # coding=utf-8
 # Copyright 2018 The Google Research Authors.
 #
@@ -17,16 +19,22 @@ from setuptools import setup
 from setuptools import find_packages
 from os import path
 
-with open(path.join("arxiv_latex_cleaner", "_version.py")) as _fh:
-    exec(_fh.read())
+from arxiv_latex_cleaner._version import __version__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+install_requires = []
+with open("requirements.txt") as f:
+    for l in f.readlines():
+        l_c = l.strip()
+        if l_c and not l_c.startswith('#'):
+            install_requires.append(l_c)
+
 setup(
     name="arxiv_latex_cleaner",
     version=__version__,
-    packages=find_packages(exclude=["*_test.py"]),
+    packages=find_packages(exclude=["*.tests"]),
     url="https://github.com/google-research/arxiv-latex-cleaner",
     license="Apache License, Version 2.0",
     author="Google Research Authors",
@@ -37,7 +45,7 @@ setup(
     entry_points={
         "console_scripts": ["arxiv_latex_cleaner=arxiv_latex_cleaner.__main__:__main__"]
     },
-    install_requires=["absl_py", "Pillow"],
+    install_requires=install_requires,
     classifiers=[
         "License :: OSI Approved :: Apache Software License",
         "Intended Audience :: Science/Research",

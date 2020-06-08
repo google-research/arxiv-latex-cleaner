@@ -6,3 +6,5 @@ arxiv-latex-cleaner.iws
 arxiv_latex_cleaner.egg-info/
 build/
 dist/
+
+*.DS_Store
