@@ -151,6 +151,29 @@ def _remove_comments(content, parameters):
   content = _remove_environment(''.join(content), 'comment')
   for command in parameters['commands_to_delete']:
     content = _remove_command(content, command)
+  return content
+
+
+def _replace_tikzpictures(content, figures):
+  """Replaces all tikzpicture environments (with includegraphic commands of external PDF figures) in the content, and writes it."""
+
+  def get_figure(matchobj):
+#      print("tikzpicture: match found ", matchobj.group(0))
+      found_tikz_filename = re.search(r'\\tikzsetnextfilename{(.*?)}',matchobj.group(0)).group(1)
+#      print("tikzpicture: looking for filename ", found_tikz_filename)
+      # search in tex split if figure is available
+      matching_tikz_filenames = _keep_pattern(figures, ['/' + found_tikz_filename + '.pdf'])
+#      print("tikzpicture: found matching filename:", matching_tikz_filenames)
+      if len(matching_tikz_filenames) == 1:
+          return '\\includegraphics{' + matching_tikz_filenames[0] + '}'
+      else:
+          return matchobj.group(0)
+
+  content = re.sub(
+      r'\\tikzsetnextfilename{[\s\S]*?\\end{tikzpicture}',
+      get_figure, content
+  )
+
   # If file ends with '\n' already, the split in last line would add an extra
   # '\n', so we remove it.
   return content.split('\n')
@@ -291,14 +314,17 @@ def _split_all_files(parameters):
       file_splits['all'], parameters['figures_to_copy_if_referenced'])
 
   file_splits['tex_in_root'] = _keep_pattern(file_splits['to_copy_in_root'],
-                                             ['.tex$'])
+                                             ['.tex$','.tikz$'])
   file_splits['tex_not_in_root'] = _keep_pattern(
-      file_splits['to_copy_not_in_root'], ['.tex$'])
+      file_splits['to_copy_not_in_root'], ['.tex$','.tikz$'])
 
   file_splits['non_tex_in_root'] = _remove_pattern(
-      file_splits['to_copy_in_root'], ['.tex$'])
+      file_splits['to_copy_in_root'], ['.tex$','.tikz$'])
   file_splits['non_tex_not_in_root'] = _remove_pattern(
-      file_splits['to_copy_not_in_root'], ['.tex$'])
+      file_splits['to_copy_not_in_root'], ['.tex$','.tikz$'])
+
+  file_splits['external_tikz_figures'] = _keep_pattern(
+      file_splits['all'], [parameters['use_external_tikz']])
 
   return file_splits
 
@@ -317,7 +343,7 @@ def run_arxiv_cleaner(parameters):
       'to_delete': [
           '.aux$', '.sh$', '.bib$', '.blg$', '.brf$', '.log$', '.out$', '.ps$',
           '.dvi$', '.synctex.gz$', '~$', '.backup$', '.gitignore$',
-          '.DS_Store$', '.svg$', '^.idea'
+          '.DS_Store$', '.svg$', '^.idea', '.dpth$', '.md5$', '.dep$', '.auxlock$'
       ],
       'figures_to_copy_if_referenced': ['.png$', '.jpg$', '.jpeg$', '.pdf$']
   })
@@ -332,6 +358,10 @@ def run_arxiv_cleaner(parameters):
   for tex_file in tex_contents:
     tex_contents[tex_file] = _remove_comments(tex_contents[tex_file],
                                               parameters)
+
+  for tex_file in tex_contents:
+    tex_contents[tex_file] = _replace_tikzpictures(tex_contents[tex_file],
+                                                     splits['external_tikz_figures'])
 
   _keep_only_referenced_tex(tex_contents, splits)
   _add_root_tex_files(splits)
