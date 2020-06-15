@@ -1,3 +1,2 @@
 absl_py~=0.6.1
 pillow>=6.2.0
-setuptools~=41.0.1
