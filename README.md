@@ -65,10 +65,10 @@ data, this feature:
 *   Replaces the tikzpicture environment `\begin{tikzpicture} ... \end{tikzpicture}`
     with the respective `\includegraphics{EXTERNAL_TIKZ_FOLDER/picture_name.pdf}`.
 *   Requires externally compiled TikZ pictures as `.pdf` files in folder `EXTERNAL_TIKZ_FOLDER`.
+    See section 53 in the PGF/TikZ manual (https://ctan.org/pkg/pgf?lang=en) on TikZ picture externalization.
 *   Only replaces environments with preceding `\tikzsetnextfilename{picture_name}` command
     (as in `\tikzsetnextfilename{picture_name}\begin{tikzpicture} ... \end{tikzpicture}`) where
-    the externalized `picture_name.pdf` filename matches `picture_name`. See section 53 in
-    the PGF/TikZ manual (https://ctan.org/pkg/pgf?lang=en) on TikZ picture externalization.
+    the externalized `picture_name.pdf` filename matches `picture_name`.
 
 ## Usage:
 
