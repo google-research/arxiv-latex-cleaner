@@ -1,0 +1,9 @@
+﻿\tikzsetnextfilename{test2}
+\begin{tikzpicture}
+\node {root}
+child {node {left}}
+child {node {right}
+child {node {child}}
+child {node {child}}
+};
+\end{tikzpicture}

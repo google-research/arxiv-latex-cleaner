@@ -10,3 +10,16 @@ This is a todo command
 
 
 \input{figures/figure_included.tex}
+
+\includegraphics{ext_tikz/test1.pdf}
+
+\input{figures/figure_included.tikz}
+
+\begin{tikzpicture}
+    \node (test) at (0,0) {Test3};
+\end{tikzpicture}
+
+\tikzsetnextfilename{test_no_match}
+\begin{tikzpicture}
+    \node (test) at (0,0) {Test4};
+\end{tikzpicture}
