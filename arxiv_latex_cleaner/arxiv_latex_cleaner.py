@@ -174,10 +174,7 @@ def _replace_tikzpictures(content, figures):
       get_figure, content
   )
 
-  # If file ends with '\n' already, the split in last line would add an extra
-  # '\n', so we remove it.
-  return content.split('\n')
-
+  return content
 
 def _resize_and_copy_figure(filename,
     origin_folder,
@@ -323,8 +320,11 @@ def _split_all_files(parameters):
   file_splits['non_tex_not_in_root'] = _remove_pattern(
       file_splits['to_copy_not_in_root'], ['.tex$','.tikz$'])
 
-  file_splits['external_tikz_figures'] = _keep_pattern(
-      file_splits['all'], [parameters['use_external_tikz']])
+  if parameters['use_external_tikz'] is not None:
+      file_splits['external_tikz_figures'] = _keep_pattern(
+          file_splits['all'], [parameters['use_external_tikz']])
+  else:
+      file_splits['external_tikz_figures'] = []
 
   return file_splits
 
@@ -360,8 +360,11 @@ def run_arxiv_cleaner(parameters):
                                               parameters)
 
   for tex_file in tex_contents:
-    tex_contents[tex_file] = _replace_tikzpictures(tex_contents[tex_file],
-                                                     splits['external_tikz_figures'])
+    content = _replace_tikzpictures(tex_contents[tex_file],
+                                    splits['external_tikz_figures'])
+    # If file ends with '\n' already, the split in last line would add an extra
+    # '\n', so we remove it.
+    tex_contents[tex_file] = content.split('\n')
 
   _keep_only_referenced_tex(tex_contents, splits)
   _add_root_tex_files(splits)
