@@ -207,7 +207,7 @@ def _resize_pdf_figure(filename, origin_folder, destination_folder, resolution,
 
 
 def _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits):
-  for fn in _keep_only_referenced(splits['non_tex_not_in_root'], contents):
+  for fn in _keep_only_referenced(splits['non_tex_not_in_root'], contents, False):
     _copy_file(fn, parameters)
 
 
@@ -229,9 +229,19 @@ def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
     )
 
 
-def _keep_only_referenced(filenames, contents):
+def _search_reference(filename, contents, extension_optional):
+  if extension_optional:
+    required, optional = os.path.splitext(filename)
+  else:
+    required, optional = filename, ""
+  # regex pattern: \{[\s%]*<basename>(<ext>)?[\s%]*\}
+  patn = r"\{{[\s%]*{}({})?[\s%]*\}}".format(required, optional)
+  return re.search(patn, contents)
+
+
+def _keep_only_referenced(filenames, contents, extension_optional=True):
   """Returns the filenames referenced from contents."""
-  return [fn for fn in filenames if os.path.splitext(fn)[0] in contents]
+  return [fn for fn in filenames if _search_reference(fn, contents, extension_optional)]
 
 
 def _keep_only_referenced_tex(contents, splits):
