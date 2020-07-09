@@ -155,25 +155,26 @@ def _remove_comments(content, parameters):
 
 
 def _replace_tikzpictures(content, figures):
-  """Replaces all tikzpicture environments (with includegraphic commands of external PDF figures) in the content, and writes it."""
+    """Replaces all tikzpicture environments (with includegraphic commands of
+    external PDF figures) in the content, and writes it."""
 
-  def get_figure(matchobj):
-      found_tikz_filename = re.search(r'\\tikzsetnextfilename{(.*?)}', matchobj.group(0)).group(1)
-#      print("tikzpicture: looking for filename ", found_tikz_filename)
-      # search in tex split if figure is available
-      matching_tikz_filenames = _keep_pattern(figures, ['/' + found_tikz_filename + '.pdf'])
-#      print("tikzpicture: found matching filename:", matching_tikz_filenames)
-      if len(matching_tikz_filenames) == 1:
-          return '\\includegraphics{' + matching_tikz_filenames[0] + '}'
-      else:
-          return matchobj.group(0)
+    def get_figure(matchobj):
+        found_tikz_filename = re.search(r'\\tikzsetnextfilename{(.*?)}',
+                                        matchobj.group(0)).group(1)
+        # search in tex split if figure is available
+        matching_tikz_filenames = _keep_pattern(figures, [
+            '/' + found_tikz_filename + '.pdf'])
+        if len(matching_tikz_filenames) == 1:
+            return '\\includegraphics{' + matching_tikz_filenames[0] + '}'
+        else:
+            return matchobj.group(0)
 
-  content = re.sub(
-      r'\\tikzsetnextfilename{[\s\S]*?\\end{tikzpicture}',
-      get_figure, content
-  )
+    content = re.sub(
+        r'\\tikzsetnextfilename{[\s\S]*?\\end{tikzpicture}',
+        get_figure, content
+    )
 
-  return content
+    return content
 
 def _resize_and_copy_figure(filename,
     origin_folder,
