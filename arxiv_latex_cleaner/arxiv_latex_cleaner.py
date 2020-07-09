@@ -158,8 +158,7 @@ def _replace_tikzpictures(content, figures):
   """Replaces all tikzpicture environments (with includegraphic commands of external PDF figures) in the content, and writes it."""
 
   def get_figure(matchobj):
-#      print("tikzpicture: match found ", matchobj.group(0))
-      found_tikz_filename = re.search(r'\\tikzsetnextfilename{(.*?)}',matchobj.group(0)).group(1)
+      found_tikz_filename = re.search(r'\\tikzsetnextfilename{(.*?)}', matchobj.group(0)).group(1)
 #      print("tikzpicture: looking for filename ", found_tikz_filename)
       # search in tex split if figure is available
       matching_tikz_filenames = _keep_pattern(figures, ['/' + found_tikz_filename + '.pdf'])

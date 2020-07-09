@@ -59,13 +59,13 @@ There is a 10MB limit on arXiv submissions, so to make it fit:
 
 #### TikZ picture source code concealment
 
-To prevent the upload of carefully crafted tikzpicture source code or raw simulation
+To prevent the upload of tikzpicture source code or raw simulation
 data, this feature:
 
 *   Replaces the tikzpicture environment `\begin{tikzpicture} ... \end{tikzpicture}`
     with the respective `\includegraphics{EXTERNAL_TIKZ_FOLDER/picture_name.pdf}`.
 *   Requires externally compiled TikZ pictures as `.pdf` files in folder `EXTERNAL_TIKZ_FOLDER`.
-    See section 53 in the PGF/TikZ manual (https://ctan.org/pkg/pgf?lang=en) on TikZ picture externalization.
+    See section 53 in the [PGF/TikZ manual](https://ctan.org/pkg/pgf?lang=en) on TikZ picture externalization.
 *   Only replaces environments with preceding `\tikzsetnextfilename{picture_name}` command
     (as in `\tikzsetnextfilename{picture_name}\begin{tikzpicture} ... \end{tikzpicture}`) where
     the externalized `picture_name.pdf` filename matches `picture_name`.
@@ -107,7 +107,7 @@ optional arguments:
                         user-defined \todo commands.
   --use_external_tikz EXTERNAL_TIKZ_FOLDER
                         Folder (relative to input folder) containing
-                        externalized TikZ figures in PDF format
+                        externalized TikZ figures in PDF format.
 ```
 
 ## Note
