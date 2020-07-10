@@ -35,12 +35,10 @@ MAX_FILENAME_LENGTH = 120
 if os.name == 'nt':
   global old_os_path_join
 
-
   def new_os_join(path, *args):
     res = old_os_path_join(path, *args)
     res = res.replace('\\', '/')
     return res
-
 
   old_os_path_join = os.path.join
 
@@ -102,15 +100,15 @@ def _remove_command(text, command):
   Regex expression used to match balanced parentheses taken from:
   https://stackoverflow.com/questions/546433/regular-expression-to-match-balanced-parentheses/35271017#35271017
   """
-  return re.sub(r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}',
-                '', text)
+  return re.sub(r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}', '',
+                text)
 
 
 def _remove_environment(text, environment):
   """Removes '\\begin{environment}*\\end{environment}' from 'text'."""
   return re.sub(
-      r'\\begin{' + environment + r'}[\s\S]*?\\end{' + environment + r'}',
-      '', text)
+      r'\\begin{' + environment + r'}[\s\S]*?\\end{' + environment + r'}', '',
+      text)
 
 
 def _remove_comments_inline(text):
@@ -155,41 +153,38 @@ def _remove_comments(content, parameters):
 
 
 def _replace_tikzpictures(content, figures):
-    """Replaces all tikzpicture environments (with includegraphic commands of
-    external PDF figures) in the content, and writes it."""
+  """Replaces all tikzpicture environments (with includegraphic commands of
 
-    def get_figure(matchobj):
-        found_tikz_filename = re.search(r'\\tikzsetnextfilename{(.*?)}',
-                                        matchobj.group(0)).group(1)
-        # search in tex split if figure is available
-        matching_tikz_filenames = _keep_pattern(figures, [
-            '/' + found_tikz_filename + '.pdf'])
-        if len(matching_tikz_filenames) == 1:
-            return '\\includegraphics{' + matching_tikz_filenames[0] + '}'
-        else:
-            return matchobj.group(0)
+    external PDF figures) in the content, and writes it.
+  """
 
-    content = re.sub(
-        r'\\tikzsetnextfilename{[\s\S]*?\\end{tikzpicture}',
-        get_figure, content
-    )
+  def get_figure(matchobj):
+    found_tikz_filename = re.search(r'\\tikzsetnextfilename{(.*?)}',
+                                    matchobj.group(0)).group(1)
+    # search in tex split if figure is available
+    matching_tikz_filenames = _keep_pattern(
+        figures, ['/' + found_tikz_filename + '.pdf'])
+    if len(matching_tikz_filenames) == 1:
+      return '\\includegraphics{' + matching_tikz_filenames[0] + '}'
+    else:
+      return matchobj.group(0)
 
-    return content
+  content = re.sub(r'\\tikzsetnextfilename{[\s\S]*?\\end{tikzpicture}',
+                   get_figure, content)
 
-def _resize_and_copy_figure(filename,
-    origin_folder,
-    destination_folder,
-    resize_image,
-    image_size,
-    compress_pdf,
-    pdf_resolution):
+  return content
+
+
+def _resize_and_copy_figure(filename, origin_folder, destination_folder,
+                            resize_image, image_size, compress_pdf,
+                            pdf_resolution):
   """Resizes and copies the input figure (either JPG, PNG, or PDF)."""
   _create_dir_if_not_exists(
       os.path.join(destination_folder, os.path.dirname(filename)))
 
-  if resize_image and os.path.splitext(filename)[1].lower() in ['.jpg',
-                                                                '.jpeg',
-                                                                '.png']:
+  if resize_image and os.path.splitext(filename)[1].lower() in [
+      '.jpg', '.jpeg', '.png'
+  ]:
     im = Image.open(os.path.join(origin_folder, filename))
     if max(im.size) > image_size:
       im = im.resize(
@@ -209,12 +204,15 @@ def _resize_and_copy_figure(filename,
         os.path.join(destination_folder, filename))
 
 
-def _resize_pdf_figure(filename, origin_folder, destination_folder, resolution,
-    timeout=10):
+def _resize_pdf_figure(filename,
+                       origin_folder,
+                       destination_folder,
+                       resolution,
+                       timeout=10):
   input_file = os.path.join(origin_folder, filename)
   output_file = os.path.join(destination_folder, filename)
-  bash_command = PDF_RESIZE_COMMAND.format(input=input_file, output=output_file,
-                                           resolution=resolution)
+  bash_command = PDF_RESIZE_COMMAND.format(
+      input=input_file, output=output_file, resolution=resolution)
   process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
 
   try:
@@ -245,8 +243,7 @@ def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
         resize_image=parameters['resize_images'],
         image_size=image_size[image_file],
         compress_pdf=parameters['compress_pdf'],
-        pdf_resolution=pdf_resolution[image_file]
-    )
+        pdf_resolution=pdf_resolution[image_file])
 
 
 def _keep_only_referenced(filenames, contents):
@@ -290,8 +287,8 @@ def _split_all_files(parameters):
   """Splits the files into types or location to know what to do with them."""
   file_splits = {
       'all':
-        _list_all_files(
-            parameters['input_folder'], ignore_dirs=['.git' + os.sep]),
+          _list_all_files(
+              parameters['input_folder'], ignore_dirs=['.git' + os.sep]),
       'in_root': [
           f for f in os.listdir(parameters['input_folder'])
           if os.path.isfile(os.path.join(parameters['input_folder'], f))
@@ -311,20 +308,20 @@ def _split_all_files(parameters):
       file_splits['all'], parameters['figures_to_copy_if_referenced'])
 
   file_splits['tex_in_root'] = _keep_pattern(file_splits['to_copy_in_root'],
-                                             ['.tex$','.tikz$'])
+                                             ['.tex$', '.tikz$'])
   file_splits['tex_not_in_root'] = _keep_pattern(
-      file_splits['to_copy_not_in_root'], ['.tex$','.tikz$'])
+      file_splits['to_copy_not_in_root'], ['.tex$', '.tikz$'])
 
   file_splits['non_tex_in_root'] = _remove_pattern(
-      file_splits['to_copy_in_root'], ['.tex$','.tikz$'])
+      file_splits['to_copy_in_root'], ['.tex$', '.tikz$'])
   file_splits['non_tex_not_in_root'] = _remove_pattern(
-      file_splits['to_copy_not_in_root'], ['.tex$','.tikz$'])
+      file_splits['to_copy_not_in_root'], ['.tex$', '.tikz$'])
 
   if parameters['use_external_tikz'] is not None:
-      file_splits['external_tikz_figures'] = _keep_pattern(
-          file_splits['all'], [parameters['use_external_tikz']])
+    file_splits['external_tikz_figures'] = _keep_pattern(
+        file_splits['all'], [parameters['use_external_tikz']])
   else:
-      file_splits['external_tikz_figures'] = []
+    file_splits['external_tikz_figures'] = []
 
   return file_splits
 
@@ -343,7 +340,8 @@ def run_arxiv_cleaner(parameters):
       'to_delete': [
           '.aux$', '.sh$', '.bib$', '.blg$', '.brf$', '.log$', '.out$', '.ps$',
           '.dvi$', '.synctex.gz$', '~$', '.backup$', '.gitignore$',
-          '.DS_Store$', '.svg$', '^.idea', '.dpth$', '.md5$', '.dep$', '.auxlock$'
+          '.DS_Store$', '.svg$', '^.idea', '.dpth$', '.md5$', '.dep$',
+          '.auxlock$'
       ],
       'figures_to_copy_if_referenced': ['.png$', '.jpg$', '.jpeg$', '.pdf$']
   })
@@ -373,8 +371,8 @@ def run_arxiv_cleaner(parameters):
     _write_file_content('\n'.join(tex_contents[tex_file]),
                         os.path.join(parameters['output_folder'], tex_file))
 
-  full_content = '\n'.join(''.join(tex_contents[fn]) for fn in
-                           splits['tex_to_copy'])
+  full_content = '\n'.join(
+      ''.join(tex_contents[fn]) for fn in splits['tex_to_copy'])
   _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
   for non_tex_file in splits['non_tex_in_root']:
     _copy_file(non_tex_file, parameters)
