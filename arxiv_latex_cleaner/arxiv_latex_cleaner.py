@@ -125,7 +125,7 @@ def _remove_comments_inline(text):
 
 
 def _read_file_content(filename):
-  with open(filename, 'r') as fp:
+  with open(filename, 'r', encoding='utf-8') as fp:
     return fp.readlines()
 
 
@@ -139,7 +139,7 @@ def _read_all_tex_contents(tex_files, parameters):
 
 def _write_file_content(content, filename):
   _create_dir_if_not_exists(os.path.dirname(filename))
-  with open(filename, 'w') as fp:
+  with open(filename, 'w', encoding='utf-8') as fp:
     return fp.write(content)
 
 
