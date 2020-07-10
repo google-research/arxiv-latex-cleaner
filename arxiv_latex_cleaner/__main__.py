@@ -83,6 +83,10 @@ PARSER.add_argument(
           "\\todo commands."),
 )
 
+PARSER.add_argument(
+    "--use_external_tikz", type=str, help="Folder (relative to input folder) containing externalized tikz figures in PDF format."
+)
+
 ARGS = vars(PARSER.parse_args())
 run_arxiv_cleaner(ARGS)
 exit(0)

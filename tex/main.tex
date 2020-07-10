@@ -17,3 +17,23 @@ Please remember that up to \texttt{2 levels} of \textit{nesting} are supported.}
 
 \input{figures/figure_included.tex}
 % \input{figures/figure_not_included.tex}
+
+% Test for tikzpicture feature
+% should be replaced
+\tikzsetnextfilename{test1}
+\begin{tikzpicture}
+    \node (test) at (0,0) {Test1};
+\end{tikzpicture}
+
+% should be replaced in included file
+\input{figures/figure_included.tikz}
+
+% should not be be replaced - no preceding tikzsetnextfilename command
+\begin{tikzpicture}
+    \node (test) at (0,0) {Test3};
+\end{tikzpicture}
+
+\tikzsetnextfilename{test_no_match}
+\begin{tikzpicture}
+    \node (test) at (0,0) {Test4};
+\end{tikzpicture}
