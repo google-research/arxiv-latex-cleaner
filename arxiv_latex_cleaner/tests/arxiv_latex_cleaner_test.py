@@ -125,18 +125,24 @@ class UnitTests(parameterized.TestCase):
       {
           'testcase_name': 'no_tikz',
           'text_in': 'Foo\n',
-          'figures_in': ['ext_tikz/test1.pdf','ext_tikz/test2.pdf'],
+          'figures_in': ['ext_tikz/test1.pdf', 'ext_tikz/test2.pdf'],
           'true_output': 'Foo\n'
       }, {
-          'testcase_name': 'tikz_no_match',
-          'text_in': 'Foo\\tikzsetnextfilename{test_no_match}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo',
+          'testcase_name':
+              'tikz_no_match',
+          'text_in':
+              'Foo\\tikzsetnextfilename{test_no_match}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo',
           'figures_in': ['ext_tikz/test1.pdf', 'ext_tikz/test2.pdf'],
-          'true_output': 'Foo\\tikzsetnextfilename{test_no_match}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo'
+          'true_output':
+              'Foo\\tikzsetnextfilename{test_no_match}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo'
       }, {
-          'testcase_name': 'tikz_match',
-          'text_in': 'Foo\\tikzsetnextfilename{test2}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo',
+          'testcase_name':
+              'tikz_match',
+          'text_in':
+              'Foo\\tikzsetnextfilename{test2}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo',
           'figures_in': ['ext_tikz/test1.pdf', 'ext_tikz/test2.pdf'],
-          'true_output': 'Foo\\includegraphics{ext_tikz/test2.pdf}\nFoo'
+          'true_output':
+              'Foo\\includegraphics{ext_tikz/test2.pdf}\nFoo'
       })
   def test_replace_tikzpictures(self, text_in, figures_in, true_output):
     self.assertEqual(
@@ -148,12 +154,12 @@ class IntegrationTests(unittest.TestCase):
 
   def _compare_files(self, filename, filename_true):
     if path.splitext(filename)[1].lower() in ['.jpg', '.jpeg', '.png']:
-      # We check only the sizes of the images, checking pixels would be too
-      # complicated in case the resize implementations change.
-      self.assertEqual(
-          Image.open(filename).size,
-          Image.open(filename_true).size,
-          'Images {:s} was not resized properly.'.format(filename))
+      with Image.open(filename) as im, Image.open(filename_true) as im_true:
+        # We check only the sizes of the images, checking pixels would be too
+        # complicated in case the resize implementations change.
+        self.assertEqual(
+            im.size, im_true.size,
+            'Images {:s} was not resized properly.'.format(filename))
     else:
       self.assertTrue(
           filecmp.cmp(filename, filename_true),
