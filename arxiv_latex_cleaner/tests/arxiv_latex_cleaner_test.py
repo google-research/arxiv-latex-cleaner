@@ -90,6 +90,25 @@ class UnitTests(parameterized.TestCase):
 
   @parameterized.named_parameters(
       {
+          'testcase_name': 'no_iffalse',
+          'text_in': 'Foo\n',
+          'true_output': 'Foo\n'
+      }, {
+          'testcase_name': 'if_not_removed',
+          'text_in': '\\ifvar\n\\ifvar\nFoo\n\\fi\n\\fi\n',
+          'true_output': '\\ifvar\n\\ifvar\nFoo\n\\fi\n\\fi\n'
+      }, {
+          'testcase_name': 'if_removed',
+          'text_in': '\\ifvar\n\\iffalse\n\\ifvar\nFoo\n\\fi\n\\fi\n\\fi\n',
+          'true_output': '\\ifvar\n\n\\fi\n'
+      })
+  def test_remove_iffalse_block(self, text_in, true_output):
+    self.assertEqual(
+        arxiv_latex_cleaner._remove_iffalse_block(text_in),
+        true_output)
+
+  @parameterized.named_parameters(
+      {
           'testcase_name': 'all_pass',
           'inputs': ['abc', 'bca'],
           'patterns': ['a'],
