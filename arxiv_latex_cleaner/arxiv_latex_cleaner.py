@@ -111,6 +111,32 @@ def _remove_environment(text, environment):
       text)
 
 
+def _remove_iffalse_block(text):
+  """Removes possibly nested '\\iffalse*\\fi' blocks from 'text'."""
+  p = re.compile(r"\\if(\w+)|\\fi")
+  level = -1
+  positions_to_del = []
+  start, end = 0, 0
+  for m in p.finditer(text):
+    if m.group() == r"\iffalse" and level == -1:
+      level += 1
+      start = m.start()
+    elif m.group().startswith(r"\if") and level >= 0:
+      level += 1
+    elif m.group() == r"\fi" and level >= 0:
+      if level == 0:
+          end = m.end()
+          positions_to_del.append((start, end))
+      level -= 1
+    else:
+      pass
+
+  for (start, end) in reversed(positions_to_del):
+    text = text[:start] + text[end:]
+
+  return text
+
+
 def _remove_comments_inline(text):
   """Removes the comments from the string 'text'."""
   if 'auto-ignore' in text:
@@ -147,6 +173,7 @@ def _remove_comments(content, parameters):
   """Erases all LaTeX comments in the content, and writes it."""
   content = [_remove_comments_inline(line) for line in content]
   content = _remove_environment(''.join(content), 'comment')
+  content = _remove_iffalse_block(content)
   for command in parameters['commands_to_delete']:
     content = _remove_command(content, command)
   return content
