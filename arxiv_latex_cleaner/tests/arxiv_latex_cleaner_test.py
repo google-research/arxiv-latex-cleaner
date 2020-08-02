@@ -90,6 +90,41 @@ class UnitTests(parameterized.TestCase):
 
   @parameterized.named_parameters(
       {
+          'testcase_name': 'no_iffalse',
+          'text_in': 'Foo\n',
+          'true_output': 'Foo\n'
+      }, {
+          'testcase_name': 'if_not_removed',
+          'text_in': '\\ifvar\n\\ifvar\nFoo\n\\fi\n\\fi\n',
+          'true_output': '\\ifvar\n\\ifvar\nFoo\n\\fi\n\\fi\n'
+      }, {
+          'testcase_name': 'if_removed_with_nested_ifvar',
+          'text_in': '\\ifvar\n\\iffalse\n\\ifvar\nFoo\n\\fi\n\\fi\n\\fi\n',
+          'true_output': '\\ifvar\n\\fi\n'
+      }, {
+          'testcase_name': 'if_removed_with_nested_iffalse',
+          'text_in': '\\ifvar\n\\iffalse\n\\iffalse\nFoo\n\\fi\n\\fi\n\\fi\n',
+          'true_output': '\\ifvar\n\\fi\n'
+      }, {
+          'testcase_name': 'if_removed_eof',
+          'text_in': '\\iffalse\nFoo\n\\fi',
+          'true_output': ''
+      }, {
+          'testcase_name': 'if_removed_space',
+          'text_in': '\\iffalse\nFoo\n\\fi ',
+          'true_output': ''
+      }, {
+          'testcase_name': 'if_removed_backslash',
+          'text_in': '\\iffalse\nFoo\n\\fi\\end{document}',
+          'true_output': '\\end{document}'
+      })
+  def test_remove_iffalse_block(self, text_in, true_output):
+    self.assertEqual(
+        arxiv_latex_cleaner._remove_iffalse_block(text_in),
+        true_output)
+
+  @parameterized.named_parameters(
+      {
           'testcase_name': 'all_pass',
           'inputs': ['abc', 'bca'],
           'patterns': ['a'],
