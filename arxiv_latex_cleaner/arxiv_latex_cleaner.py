@@ -130,9 +130,13 @@ def _remove_iffalse_block(text):
       level -= 1
     else:
       pass
-
+    
   for (start, end) in reversed(positions_to_del):
-    text = text[:start] + text[end:]
+    if end < len(text) and text[end].isspace():
+      end_to_del = end + 1
+    else:
+      end_to_del = end
+    text = text[:start] + text[end_to_del:]
 
   return text
 
