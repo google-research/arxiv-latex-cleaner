@@ -120,8 +120,7 @@ class UnitTests(parameterized.TestCase):
       })
   def test_remove_iffalse_block(self, text_in, true_output):
     self.assertEqual(
-        arxiv_latex_cleaner._remove_iffalse_block(text_in),
-        true_output)
+        arxiv_latex_cleaner._remove_iffalse_block(text_in), true_output)
 
   @parameterized.named_parameters(
       {

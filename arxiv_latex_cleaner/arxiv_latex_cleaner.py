@@ -125,12 +125,12 @@ def _remove_iffalse_block(text):
       level += 1
     elif m.group() == r'\fi' and level >= 0:
       if level == 0:
-          end = m.end()
-          positions_to_del.append((start, end))
+        end = m.end()
+        positions_to_del.append((start, end))
       level -= 1
     else:
       pass
-    
+
   for (start, end) in reversed(positions_to_del):
     if end < len(text) and text[end].isspace():
       end_to_del = end + 1
