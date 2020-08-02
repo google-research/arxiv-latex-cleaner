@@ -112,18 +112,18 @@ def _remove_environment(text, environment):
 
 
 def _remove_iffalse_block(text):
-  """Removes possibly nested '\\iffalse*\\fi' blocks from 'text'."""
-  p = re.compile(r"\\if(\w+)|\\fi")
+  """Removes possibly nested r'\iffalse*\fi' blocks from 'text'."""
+  p = re.compile(r'\\if(\w+)|\\fi')
   level = -1
   positions_to_del = []
   start, end = 0, 0
   for m in p.finditer(text):
-    if m.group() == r"\iffalse" and level == -1:
+    if m.group() == r'\iffalse' and level == -1:
       level += 1
       start = m.start()
-    elif m.group().startswith(r"\if") and level >= 0:
+    elif m.group().startswith(r'\if') and level >= 0:
       level += 1
-    elif m.group() == r"\fi" and level >= 0:
+    elif m.group() == r'\fi' and level >= 0:
       if level == 0:
           end = m.end()
           positions_to_del.append((start, end))
