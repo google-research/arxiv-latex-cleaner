@@ -35,6 +35,7 @@ setup(
     name="arxiv_latex_cleaner",
     version=__version__,
     packages=find_packages(exclude=["*.tests"]),
+    python_requires='>=3',
     url="https://github.com/google-research/arxiv-latex-cleaner",
     license="Apache License, Version 2.0",
     author="Google Research Authors",

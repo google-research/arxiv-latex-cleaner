@@ -17,6 +17,9 @@ arxiv_latex_cleaner /path/to/latex --im_size 500 --images_whitelist='{"images/im
 pip install arxiv-latex-cleaner
 ```
 
+| :exclamation:  arxiv_latex_cleaner is only compatible with Python >=3  :exclamation: |
+|--------------------------------------------------------------------------------------|
+
 Alternatively, you can download the source code:
 
 ```console
@@ -38,13 +41,13 @@ python setup.py install
 *   Removes all auxiliary files (`.aux`, `.log`, `.out`, etc.).
 *   Removes all comments from your code (yes, those are visible on arXiv and you
     do not want them to be). These also include `\begin{comment}\end{comment}`
-    environments.
+    and `\iffalse\fi` environments.
 *   Optionally removes user-defined commands entered with `commands_to_delete`
-    (such as `\todo{}` that you at the end redefine as the empty string).
+    (such as `\todo{}` that you redefine as the empty string at the end).
 
 #### Size-oriented
 
-There is a 10MB limit on arXiv submissions, so to make it fit:
+There is a 50MB limit on arXiv submissions, so to make it fit:
 
 *   Removes all unused `.tex` files (those that are not in the root and not
     included in any other `.tex` file).
@@ -73,7 +76,7 @@ data, this feature:
 ## Usage:
 
 ```
-usage: arxiv_latex_cleaner@v0.1.4 [-h] [--resize_images] [--im_size IM_SIZE]
+usage: arxiv_latex_cleaner@v0.1.8 [-h] [--resize_images] [--im_size IM_SIZE]
                                   [--compress_pdf]
                                   [--pdf_im_resolution PDF_IM_RESOLUTION]
                                   [--images_whitelist IMAGES_WHITELIST]
