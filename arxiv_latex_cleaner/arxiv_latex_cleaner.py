@@ -398,9 +398,16 @@ def run_arxiv_cleaner(parameters):
   _keep_only_referenced_tex(tex_contents, splits)
   _add_root_tex_files(splits)
 
-  for tex_file in splits['tex_to_copy']:
-    _write_file_content('\n'.join(tex_contents[tex_file]),
-                        os.path.join(parameters['output_folder'], tex_file))
+    for tex_file in splits["tex_to_copy"]:
+        content = "\n".join(tex_contents[tex_file])
+        content = _find_and_replace_patterns(
+            content,
+            parameters.get("patterns_and_insertions", list()),
+            parameters.get("verbose", False),
+        )
+        _write_file_content(
+            content, os.path.join(parameters["output_folder"], tex_file),
+        )
 
   full_content = '\n'.join(
       ''.join(tex_contents[fn]) for fn in splits['tex_to_copy'])
@@ -409,6 +416,15 @@ def run_arxiv_cleaner(parameters):
     _copy_file(non_tex_file, parameters)
 
   _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
+
+
+def strip_whitespace(text):
+    """Strip all whitespace characters
+    https://stackoverflow.com/questions/8270092/remove-all-whitespace-in-a-string
+    """
+    pattern = re.compile(r"\s+")
+    text = re.sub(pattern, "", text)
+    return text
 
 
 def merge_args_into_config(args, config_params):
@@ -428,3 +444,39 @@ def merge_args_into_config(args, config_params):
         else:
             final_args[key] = value
     return final_args
+
+
+def _find_and_replace_patterns(content, patterns_and_insertions, verbose=False):
+    """
+    content: str
+    patterns: List[Dict]
+
+    Example for patterns:
+    
+        [
+            {
+                "pattern" : r"(?:\\figcompfigures{\s*)(?P<first>.*?)\s*}\s*{\s*(?P<second>.*?)\s*}\s*{\s*(?P<third>.*?)\s*}",
+                "insertion" : r"\parbox[c]{{{second}\linewidth}}{{\includegraphics[width={third}\linewidth]{{figures/{first}}}}}}",
+                "description": "Replace figcompfigures"
+            },
+        ]
+    """
+    for pattern_and_insertion in patterns_and_insertions:
+        pattern = pattern_and_insertion["pattern"]
+        insertion = pattern_and_insertion["insertion"]
+        description = pattern_and_insertion["description"]
+        if verbose:
+            print(f"Processing pattern: '{description}'.")
+
+        p = re.compile(pattern)
+        m = p.search(content)
+        while m is not None:
+            local_insertion = insertion.format(**m.groupdict())
+            local_insertion = strip_whitespace(local_insertion)
+            if verbose:
+                log_txt = f"{content[m.start():m.end()]:<20} --> {local_insertion}"
+                print(log_txt)
+            new_content = content[: m.start()] + local_insertion + content[m.end() :]
+            content = new_content
+            m = p.search(content)
+    return content

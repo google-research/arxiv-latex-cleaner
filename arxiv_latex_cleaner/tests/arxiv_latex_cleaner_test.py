@@ -47,6 +47,37 @@ def make_args(
     return args
 
 
+def make_contents():
+    contents = (
+        r"& \figcompfigures{"
+        "\n\timage1.jpg"
+        "\n}{"
+        "\n\t\ww"
+        "\n}{"
+        "\n\t1.0"
+        "\n\t}"
+        "\n& "
+        r"\figcompfigures{image2.jpg}{\ww}{1.0}"
+    )
+    return contents
+
+
+def make_patterns():
+    pattern = r"(?:\\figcompfigures{\s*)(?P<first>.*?)\s*}\s*{\s*(?P<second>.*?)\s*}\s*{\s*(?P<third>.*?)\s*}"
+    insertion = r"""\parbox[c]{{
+            {second}\linewidth
+        }}{{
+            \includegraphics[
+                width={third}\linewidth
+            ]{{
+                figures/{first}
+            }}
+        }} """
+    description = "Replace figcompfigures"
+    output = {"pattern": pattern, "insertion": insertion, "description": description}
+    return [output]
+
+
 class UnitTests(parameterized.TestCase):
     @parameterized.named_parameters(
         {
@@ -217,27 +248,26 @@ class UnitTests(parameterized.TestCase):
 
   @parameterized.named_parameters(
       {
-          'testcase_name': 'no_tikz',
-          'text_in': 'Foo\n',
-          'figures_in': ['ext_tikz/test1.pdf', 'ext_tikz/test2.pdf'],
-          'true_output': 'Foo\n'
-      }, {
-          'testcase_name':
-              'tikz_no_match',
-          'text_in':
-              'Foo\\tikzsetnextfilename{test_no_match}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo',
-          'figures_in': ['ext_tikz/test1.pdf', 'ext_tikz/test2.pdf'],
-          'true_output':
-              'Foo\\tikzsetnextfilename{test_no_match}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo'
-      }, {
-          'testcase_name':
-              'tikz_match',
-          'text_in':
-              'Foo\\tikzsetnextfilename{test2}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo',
-          'figures_in': ['ext_tikz/test1.pdf', 'ext_tikz/test2.pdf'],
-          'true_output':
-              'Foo\\includegraphics{ext_tikz/test2.pdf}\nFoo'
-      })
+            "testcase_name": "replace_contents",
+            "content": make_contents(),
+            "patterns_and_insertions": make_patterns(),
+            "true_outputs": (
+                r"& \parbox[c]{\ww\linewidth}{\includegraphics[width=1.0\linewidth]{figures/image1.jpg}}"
+                "\n"
+                r"& \parbox[c]{\ww\linewidth}{\includegraphics[width=1.0\linewidth]{figures/image2.jpg}}"
+            ),
+        },
+    )
+    def test_find_and_replace_patterns(
+        self, content, patterns_and_insertions, true_outputs
+    ):
+        output = arxiv_latex_cleaner._find_and_replace_patterns(
+            content, patterns_and_insertions
+        )
+        output = arxiv_latex_cleaner.strip_whitespace(output)
+        true_outputs = arxiv_latex_cleaner.strip_whitespace(true_outputs)
+        self.assertEqual(output, true_outputs)
+
   def test_replace_tikzpictures(self, text_in, figures_in, true_output):
     self.assertEqual(
         arxiv_latex_cleaner._replace_tikzpictures(text_in, figures_in),
