@@ -27,6 +27,7 @@ from .arxiv_latex_cleaner import run_arxiv_cleaner, merge_args_into_config
 import argparse
 import json
 import yaml
+import logging
 
 PARSER = argparse.ArgumentParser(
     prog="arxiv_latex_cleaner@{0}".format(__version__),
@@ -106,6 +107,13 @@ if ARGS["config"] is not None:
         final_args.pop("config", None)
 else:
     final_args = ARGS
+
+
+if final_args.get("verbose", False):
+    logging.basicConfig(level=logging.INFO)
+else:
+    logging.basicConfig(level=logging.ERROR)
+
 
 run_arxiv_cleaner(final_args)
 exit(0)

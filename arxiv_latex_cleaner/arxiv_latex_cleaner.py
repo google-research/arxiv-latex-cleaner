@@ -446,7 +446,7 @@ def merge_args_into_config(args, config_params):
     return final_args
 
 
-def _find_and_replace_patterns(content, patterns_and_insertions, verbose=False):
+def _find_and_replace_patterns(content, patterns_and_insertions):
     """
     content: str
     patterns: List[Dict]
@@ -465,18 +465,16 @@ def _find_and_replace_patterns(content, patterns_and_insertions, verbose=False):
         pattern = pattern_and_insertion["pattern"]
         insertion = pattern_and_insertion["insertion"]
         description = pattern_and_insertion["description"]
-        if verbose:
-            print(f"Processing pattern: '{description}'.")
-
+        logging.info(f"Processing pattern: '{description}'.")
         p = re.compile(pattern)
         m = p.search(content)
         while m is not None:
             local_insertion = insertion.format(**m.groupdict())
             local_insertion = strip_whitespace(local_insertion)
-            if verbose:
-                log_txt = f"{content[m.start():m.end()]:<20} --> {local_insertion}"
-                print(log_txt)
+            logging.info(f"-- Found {content[m.start():m.end()]:<70}")
+            logging.info(f"-- Replacing with {local_insertion:<30}")
             new_content = content[: m.start()] + local_insertion + content[m.end() :]
             content = new_content
             m = p.search(content)
+        logging.info(f"Finished pattern: '{description}'.")
     return content
