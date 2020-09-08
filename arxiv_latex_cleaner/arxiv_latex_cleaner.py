@@ -409,3 +409,22 @@ def run_arxiv_cleaner(parameters):
     _copy_file(non_tex_file, parameters)
 
   _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
+
+
+def merge_args_into_config(args, config_params):
+    final_args = copy.deepcopy(config_params)
+    config_keys = config_params.keys()
+    for key, value in args.items():
+        if key in config_keys:
+            if any([isinstance(value, t) for t in [str, bool, float, int]]):
+                # overwrite config value with args value
+                final_args[key] = value
+            elif isinstance(value, list):
+                # append args values to config values
+                final_args[key] = value + config_params[key]
+            elif isinstance(value, dict):
+                # update config params with args params
+                final_args[key].update(**value)
+        else:
+            final_args[key] = value
+    return final_args

@@ -22,10 +22,11 @@ Main module for ``arxiv_latex_cleaner``
 """
 
 from ._version import __version__
-from .arxiv_latex_cleaner import run_arxiv_cleaner
+from .arxiv_latex_cleaner import run_arxiv_cleaner, merge_args_into_config
 
 import argparse
 import json
+import yaml
 
 PARSER = argparse.ArgumentParser(
     prog="arxiv_latex_cleaner@{0}".format(__version__),
@@ -84,9 +85,27 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
-    "--use_external_tikz", type=str, help="Folder (relative to input folder) containing externalized tikz figures in PDF format."
+    "--config",
+    type=str,
+    help="Read settings from `.yaml` config file. If command line arguments are provided additionally, the config file parameters are updated with the command line parameters.",
+    required=False,
 )
 
 ARGS = vars(PARSER.parse_args())
-run_arxiv_cleaner(ARGS)
+
+
+if ARGS["config"] is not None:
+    try:
+        with open(ARGS["config"], "r") as config_file:
+            config_params = yaml.safe_load(config_file)
+        final_args = merge_args_into_config(ARGS, config_params)
+
+    except FileNotFoundError:
+        print(f"config file {ARGS.config} not found.")
+        final_args = ARGS
+        final_args.pop("config", None)
+else:
+    final_args = ARGS
+
+run_arxiv_cleaner(final_args)
 exit(0)

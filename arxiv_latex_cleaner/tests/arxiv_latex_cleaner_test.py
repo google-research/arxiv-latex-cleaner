@@ -20,10 +20,70 @@ import unittest
 from absl.testing import parameterized
 
 from arxiv_latex_cleaner import arxiv_latex_cleaner
+from arxiv_latex_cleaner.arxiv_latex_cleaner import merge_args_into_config
 from PIL import Image
 
 
+def make_args(
+    input_folder="foo/bar",
+    resize_images=False,
+    im_size=500,
+    compress_pdf=False,
+    pdf_im_resolution=500,
+    images_whitelist={},
+    commands_to_delete=[],
+    use_external_tikz="foo/bar/tikz",
+):
+    args = {
+        "input_folder": input_folder,
+        "resize_images": resize_images,
+        "im_size": im_size,
+        "compress_pdf": compress_pdf,
+        "pdf_im_resolution": pdf_im_resolution,
+        "images_whitelist": images_whitelist,
+        "commands_to_delete": commands_to_delete,
+        "use_external_tikz": use_external_tikz,
+    }
+    return args
+
+
 class UnitTests(parameterized.TestCase):
+    @parameterized.named_parameters(
+        {
+            "testcase_name": "empty config",
+            "args": make_args(),
+            "config_params": {},
+            "final_args": make_args(),
+        },
+        {
+            "testcase_name": "empty args",
+            "args": {},
+            "config_params": make_args(),
+            "final_args": make_args(),
+        },
+        {
+            "testcase_name": "args and config provided",
+            "args": make_args(
+                images_whitelist={"path1/": 1000}, commands_to_delete=[r"\todo1"]
+            ),
+            "config_params": make_args(
+                "foo_/bar_",
+                True,
+                1000,
+                True,
+                1000,
+                images_whitelist={"path2/": 1000},
+                commands_to_delete=[r"\todo2"],
+                use_external_tikz="foo_/bar_/tikz_",
+            ),
+            "final_args": make_args(
+                images_whitelist={"path1/": 1000, "path2/": 1000},
+                commands_to_delete=[r"\todo1", r"\todo2"],
+            ),
+        },
+    )
+    def test_merge_args_into_config(self, args, config_params, final_args):
+        self.assertEqual(merge_args_into_config(args, config_params), final_args)
 
   @parameterized.named_parameters(
       {
