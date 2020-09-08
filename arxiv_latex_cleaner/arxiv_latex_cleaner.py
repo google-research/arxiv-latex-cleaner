@@ -384,16 +384,15 @@ def run_arxiv_cleaner(parameters):
 
   splits = _split_all_files(parameters)
 
+    logging.info("Reading all tex files")
   tex_contents = _read_all_tex_contents(
       splits['tex_in_root'] + splits['tex_not_in_root'], parameters)
 
   for tex_file in tex_contents:
-    tex_contents[tex_file] = _remove_comments(tex_contents[tex_file],
-                                              parameters)
+        logging.info(f"Removing comments in file {tex_file}.")
 
   for tex_file in tex_contents:
-    content = _replace_tikzpictures(tex_contents[tex_file],
-                                    splits['external_tikz_figures'])
+        logging.info(f"Replacing Tikz Pictures in file {tex_file}.")
     # If file ends with '\n' already, the split in last line would add an extra
     # '\n', so we remove it.
     tex_contents[tex_file] = content.split('\n')
@@ -402,23 +401,27 @@ def run_arxiv_cleaner(parameters):
   _add_root_tex_files(splits)
 
     for tex_file in splits["tex_to_copy"]:
-        logging.info(f"Processing file {tex_file}")
+        logging.info(f"Replacing patterns in file {tex_file}.")
         content = "\n".join(tex_contents[tex_file])
         content = _find_and_replace_patterns(
             content, parameters.get("patterns_and_insertions", list())
         )
         tex_contents[tex_file] = content
+        new_path = os.path.join(parameters["output_folder"], tex_file)
+        logging.info(f"Writing modified contents to {new_path}.")
         _write_file_content(
-            content, os.path.join(parameters["output_folder"], tex_file),
+            content, new_path,
         )
 
   full_content = '\n'.join(
       ''.join(tex_contents[fn]) for fn in splits['tex_to_copy'])
   _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
-  for non_tex_file in splits['non_tex_in_root']:
+        logging.info(f"Copying non-tex file {non_tex_file}.")
     _copy_file(non_tex_file, parameters)
 
   _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
+
+    logging.info("Outputs written to {}".format(parameters["output_folder"]))
 
 
 def strip_whitespace(text):
