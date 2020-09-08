@@ -92,6 +92,11 @@ PARSER.add_argument(
     required=False,
 )
 
+PARSER.add_argument(
+    "--verbose", action="store_true", help="Enable detailed output.",
+)
+
+
 ARGS = vars(PARSER.parse_args())
 
 
