@@ -14,10 +14,13 @@
 # limitations under the License.
 """Cleans the LaTeX code of your paper to submit to arXiv."""
 import collections
+
+import copy
 import os
 import re
 import shutil
 import subprocess
+import logging
 
 from PIL import Image
 
@@ -449,9 +452,9 @@ def merge_args_into_config(args, config_params):
 def _find_and_replace_patterns(content, patterns_and_insertions):
     """
     content: str
-    patterns: List[Dict]
+    patterns_and_insertions: List[Dict]
 
-    Example for patterns:
+    Example for patterns_and_insertions:
     
         [
             {
@@ -467,14 +470,18 @@ def _find_and_replace_patterns(content, patterns_and_insertions):
         description = pattern_and_insertion["description"]
         logging.info(f"Processing pattern: '{description}'.")
         p = re.compile(pattern)
-        m = p.search(content)
+        remaining_content = content
+        adjusted_content = ""
+        m = p.search(remaining_content)
         while m is not None:
             local_insertion = insertion.format(**m.groupdict())
             local_insertion = strip_whitespace(local_insertion)
-            logging.info(f"-- Found {content[m.start():m.end()]:<70}")
-            logging.info(f"-- Replacing with {local_insertion:<30}")
-            new_content = content[: m.start()] + local_insertion + content[m.end() :]
-            content = new_content
-            m = p.search(content)
+            logging.info(f"Found {remaining_content[m.start():m.end()]:<70}")
+            logging.info(f"Replacing with {local_insertion:<30}")
+            adjusted_content += remaining_content[: m.start()] + local_insertion
+            remaining_content = remaining_content[m.end() :]
+
+            m = p.search(remaining_content)
+        adjusted_content += remaining_content
         logging.info(f"Finished pattern: '{description}'.")
-    return content
+    return adjusted_content
