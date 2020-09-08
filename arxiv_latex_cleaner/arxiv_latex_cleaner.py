@@ -399,12 +399,12 @@ def run_arxiv_cleaner(parameters):
   _add_root_tex_files(splits)
 
     for tex_file in splits["tex_to_copy"]:
+        logging.info(f"Processing file {tex_file}")
         content = "\n".join(tex_contents[tex_file])
         content = _find_and_replace_patterns(
-            content,
-            parameters.get("patterns_and_insertions", list()),
-            parameters.get("verbose", False),
+            content, parameters.get("patterns_and_insertions", list())
         )
+        tex_contents[tex_file] = content
         _write_file_content(
             content, os.path.join(parameters["output_folder"], tex_file),
         )
