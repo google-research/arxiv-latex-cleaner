@@ -478,18 +478,13 @@ def _find_and_replace_patterns(content, patterns_and_insertions):
         description = pattern_and_insertion["description"]
         logging.info(f"Processing pattern: '{description}'.")
         p = re.compile(pattern)
-        remaining_content = content
-        adjusted_content = ""
-        m = p.search(remaining_content)
+        m = p.search(content)
         while m is not None:
             local_insertion = insertion.format(**m.groupdict())
             local_insertion = strip_whitespace(local_insertion)
-            logging.info(f"Found {remaining_content[m.start():m.end()]:<70}")
+            logging.info(f"Found {content[m.start():m.end()]:<70}")
             logging.info(f"Replacing with {local_insertion:<30}")
-            adjusted_content += remaining_content[: m.start()] + local_insertion
-            remaining_content = remaining_content[m.end() :]
-
-            m = p.search(remaining_content)
-        adjusted_content += remaining_content
+            content = content[: m.start()] + local_insertion + content[m.end() :]
+            m = p.search(content)
         logging.info(f"Finished pattern: '{description}'.")
-    return adjusted_content
+    return content
