@@ -351,7 +351,7 @@ def _split_all_files(parameters):
   file_splits['non_tex_not_in_root'] = _remove_pattern(
       file_splits['to_copy_not_in_root'], ['.tex$', '.tikz$'])
 
-  if parameters['use_external_tikz'] is not None:
+  if parameters.get('use_external_tikz', None) is not None:
     file_splits['external_tikz_figures'] = _keep_pattern(
         file_splits['all'], [parameters['use_external_tikz']])
   else:
@@ -380,19 +380,24 @@ def run_arxiv_cleaner(parameters):
       'figures_to_copy_if_referenced': ['.png$', '.jpg$', '.jpeg$', '.pdf$']
   })
 
+  logging.info("Collecting file structure.")
   parameters['output_folder'] = _create_out_folder(parameters['input_folder'])
 
   splits = _split_all_files(parameters)
 
-    logging.info("Reading all tex files")
+  logging.info("Reading all tex files")
   tex_contents = _read_all_tex_contents(
       splits['tex_in_root'] + splits['tex_not_in_root'], parameters)
 
   for tex_file in tex_contents:
-        logging.info(f"Removing comments in file {tex_file}.")
+    logging.info(f"Removing comments in file {tex_file}.")
+    tex_contents[tex_file] = _remove_comments(tex_contents[tex_file],
+                                              parameters)
 
   for tex_file in tex_contents:
-        logging.info(f"Replacing Tikz Pictures in file {tex_file}.")
+    logging.info(f"Replacing Tikz Pictures in file {tex_file}.")
+    content = _replace_tikzpictures(tex_contents[tex_file],
+                                splits['external_tikz_figures'])
     # If file ends with '\n' already, the split in last line would add an extra
     # '\n', so we remove it.
     tex_contents[tex_file] = content.split('\n')
@@ -400,28 +405,28 @@ def run_arxiv_cleaner(parameters):
   _keep_only_referenced_tex(tex_contents, splits)
   _add_root_tex_files(splits)
 
-    for tex_file in splits["tex_to_copy"]:
-        logging.info(f"Replacing patterns in file {tex_file}.")
-        content = "\n".join(tex_contents[tex_file])
-        content = _find_and_replace_patterns(
-            content, parameters.get("patterns_and_insertions", list())
-        )
-        tex_contents[tex_file] = content
-        new_path = os.path.join(parameters["output_folder"], tex_file)
-        logging.info(f"Writing modified contents to {new_path}.")
-        _write_file_content(
-            content, new_path,
-        )
+  for tex_file in splits["tex_to_copy"]:
+    logging.info(f"Replacing patterns in file {tex_file}.")
+    content = "\n".join(tex_contents[tex_file])
+    content = _find_and_replace_patterns(
+        content, parameters.get("patterns_and_insertions", list())
+    )
+    tex_contents[tex_file] = content
+    new_path = os.path.join(parameters["output_folder"], tex_file)
+    logging.info(f"Writing modified contents to {new_path}.")
+    _write_file_content(
+        content, new_path,
+    )
 
   full_content = '\n'.join(
       ''.join(tex_contents[fn]) for fn in splits['tex_to_copy'])
   _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
-        logging.info(f"Copying non-tex file {non_tex_file}.")
+  for non_tex_file in splits['non_tex_in_root']:
+    logging.info(f"Copying non-tex file {non_tex_file}.")
     _copy_file(non_tex_file, parameters)
 
   _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
-
-    logging.info("Outputs written to {}".format(parameters["output_folder"]))
+  logging.info("Outputs written to {}".format(parameters["output_folder"]))
 
 
 def strip_whitespace(text):
