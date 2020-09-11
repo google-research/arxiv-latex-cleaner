@@ -114,14 +114,14 @@ patterns.
 ## Usage:
 
 ```
-usage: arxiv_latex_cleaner@v0.1.9 [-h] [--resize_images] [--im_size IM_SIZE]
-                                  [--compress_pdf]
-                                  [--pdf_im_resolution PDF_IM_RESOLUTION]
-                                  [--images_whitelist IMAGES_WHITELIST]
-                                  [--commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]]
-                                  [--verbose]
-                                  [--config CONFIG_PATH]
-                                  input_folder
+usage: arxiv_latex_cleaner@v0.1.10 [-h] [--resize_images] [--im_size IM_SIZE]
+                                   [--compress_pdf]
+                                   [--pdf_im_resolution PDF_IM_RESOLUTION]
+                                   [--images_whitelist IMAGES_WHITELIST]
+                                   [--commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]]
+                                   [--verbose]
+                                   [--config CONFIG_PATH]
+                                   input_folder
 
 Clean the LaTeX code of your paper to submit to arXiv. Check the README for
 more information on the use.
