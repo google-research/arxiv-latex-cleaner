@@ -20,51 +20,48 @@ import unittest
 from absl.testing import parameterized
 
 from arxiv_latex_cleaner import arxiv_latex_cleaner
-from arxiv_latex_cleaner.arxiv_latex_cleaner import merge_args_into_config
 from PIL import Image
 
 
 def make_args(
-    input_folder="foo/bar",
+    input_folder='foo/bar',
     resize_images=False,
     im_size=500,
     compress_pdf=False,
     pdf_im_resolution=500,
     images_whitelist={},
     commands_to_delete=[],
-    use_external_tikz="foo/bar/tikz",
+    use_external_tikz='foo/bar/tikz',
 ):
-    args = {
-        "input_folder": input_folder,
-        "resize_images": resize_images,
-        "im_size": im_size,
-        "compress_pdf": compress_pdf,
-        "pdf_im_resolution": pdf_im_resolution,
-        "images_whitelist": images_whitelist,
-        "commands_to_delete": commands_to_delete,
-        "use_external_tikz": use_external_tikz,
-    }
-    return args
+  args = {
+      'input_folder': input_folder,
+      'resize_images': resize_images,
+      'im_size': im_size,
+      'compress_pdf': compress_pdf,
+      'pdf_im_resolution': pdf_im_resolution,
+      'images_whitelist': images_whitelist,
+      'commands_to_delete': commands_to_delete,
+      'use_external_tikz': use_external_tikz,
+  }
+  return args
 
 
 def make_contents():
-    contents = (
-        r"& \figcompfigures{"
-        "\n\timage1.jpg"
-        "\n}{"
-        "\n\t\ww"
-        "\n}{"
-        "\n\t1.0"
-        "\n\t}"
-        "\n& "
-        r"\figcompfigures{image2.jpg}{\ww}{1.0}"
-    )
-    return contents
+  contents = (r'& \figcompfigures{'
+              '\n\timage1.jpg'
+              '\n}{'
+              '\n\t\ww'
+              '\n}{'
+              '\n\t1.0'
+              '\n\t}'
+              '\n& '
+              r'\figcompfigures{image2.jpg}{\ww}{1.0}')
+  return contents
 
 
 def make_patterns():
-    pattern = r"(?:\\figcompfigures{\s*)(?P<first>.*?)\s*}\s*{\s*(?P<second>.*?)\s*}\s*{\s*(?P<third>.*?)\s*}"
-    insertion = r"""\parbox[c]{{
+  pattern = r'(?:\\figcompfigures{\s*)(?P<first>.*?)\s*}\s*{\s*(?P<second>.*?)\s*}\s*{\s*(?P<third>.*?)\s*}'
+  insertion = r"""\parbox[c]{{
             {second}\linewidth
         }}{{
             \includegraphics[
@@ -73,48 +70,62 @@ def make_patterns():
                 figures/{first}
             }}
         }} """
-    description = "Replace figcompfigures"
-    output = {"pattern": pattern, "insertion": insertion, "description": description}
-    return [output]
+  description = 'Replace figcompfigures'
+  output = {
+      'pattern': pattern,
+      'insertion': insertion,
+      'description': description
+  }
+  return [output]
 
 
 class UnitTests(parameterized.TestCase):
-    @parameterized.named_parameters(
-        {
-            "testcase_name": "empty config",
-            "args": make_args(),
-            "config_params": {},
-            "final_args": make_args(),
-        },
-        {
-            "testcase_name": "empty args",
-            "args": {},
-            "config_params": make_args(),
-            "final_args": make_args(),
-        },
-        {
-            "testcase_name": "args and config provided",
-            "args": make_args(
-                images_whitelist={"path1/": 1000}, commands_to_delete=[r"\todo1"]
-            ),
-            "config_params": make_args(
-                "foo_/bar_",
-                True,
-                1000,
-                True,
-                1000,
-                images_whitelist={"path2/": 1000},
-                commands_to_delete=[r"\todo2"],
-                use_external_tikz="foo_/bar_/tikz_",
-            ),
-            "final_args": make_args(
-                images_whitelist={"path1/": 1000, "path2/": 1000},
-                commands_to_delete=[r"\todo1", r"\todo2"],
-            ),
-        },
-    )
-    def test_merge_args_into_config(self, args, config_params, final_args):
-        self.assertEqual(merge_args_into_config(args, config_params), final_args)
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'empty config',
+          'args': make_args(),
+          'config_params': {},
+          'final_args': make_args(),
+      },
+      {
+          'testcase_name': 'empty args',
+          'args': {},
+          'config_params': make_args(),
+          'final_args': make_args(),
+      },
+      {
+          'testcase_name':
+              'args and config provided',
+          'args':
+              make_args(
+                  images_whitelist={'path1/': 1000},
+                  commands_to_delete=[r'\todo1']),
+          'config_params':
+              make_args(
+                  'foo_/bar_',
+                  True,
+                  1000,
+                  True,
+                  1000,
+                  images_whitelist={'path2/': 1000},
+                  commands_to_delete=[r'\todo2'],
+                  use_external_tikz='foo_/bar_/tikz_',
+              ),
+          'final_args':
+              make_args(
+                  images_whitelist={
+                      'path1/': 1000,
+                      'path2/': 1000
+                  },
+                  commands_to_delete=[r'\todo1', r'\todo2'],
+              ),
+      },
+  )
+  def test_merge_args_into_config(self, args, config_params, final_args):
+    self.assertEqual(
+        arxiv_latex_cleaner.merge_args_into_config(args, config_params),
+        final_args)
 
   @parameterized.named_parameters(
       {
@@ -248,26 +259,49 @@ class UnitTests(parameterized.TestCase):
 
   @parameterized.named_parameters(
       {
-            "testcase_name": "replace_contents",
-            "content": make_contents(),
-            "patterns_and_insertions": make_patterns(),
-            "true_outputs": (
-                r"& \parbox[c]{\ww\linewidth}{\includegraphics[width=1.0\linewidth]{figures/image1.jpg}}"
-                "\n"
-                r"& \parbox[c]{\ww\linewidth}{\includegraphics[width=1.0\linewidth]{figures/image2.jpg}}"
-            ),
-        },
-    )
-    def test_find_and_replace_patterns(
-        self, content, patterns_and_insertions, true_outputs
-    ):
-        output = arxiv_latex_cleaner._find_and_replace_patterns(
-            content, patterns_and_insertions
-        )
-        output = arxiv_latex_cleaner.strip_whitespace(output)
-        true_outputs = arxiv_latex_cleaner.strip_whitespace(true_outputs)
-        self.assertEqual(output, true_outputs)
+          'testcase_name':
+              'replace_contents',
+          'content':
+              make_contents(),
+          'patterns_and_insertions':
+              make_patterns(),
+          'true_outputs': (
+              r'& \parbox[c]{\ww\linewidth}{\includegraphics[width=1.0\linewidth]{figures/image1.jpg}}'
+              '\n'
+              r'& \parbox[c]{\ww\linewidth}{\includegraphics[width=1.0\linewidth]{figures/image2.jpg}}'
+          ),
+      },)
+  def test_find_and_replace_patterns(self, content, patterns_and_insertions,
+                                     true_outputs):
+    output = arxiv_latex_cleaner._find_and_replace_patterns(
+        content, patterns_and_insertions)
+    output = arxiv_latex_cleaner.strip_whitespace(output)
+    true_outputs = arxiv_latex_cleaner.strip_whitespace(true_outputs)
+    self.assertEqual(output, true_outputs)
 
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'no_tikz',
+          'text_in': 'Foo\n',
+          'figures_in': ['ext_tikz/test1.pdf', 'ext_tikz/test2.pdf'],
+          'true_output': 'Foo\n'
+      }, {
+          'testcase_name':
+              'tikz_no_match',
+          'text_in':
+              'Foo\\tikzsetnextfilename{test_no_match}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo',
+          'figures_in': ['ext_tikz/test1.pdf', 'ext_tikz/test2.pdf'],
+          'true_output':
+              'Foo\\tikzsetnextfilename{test_no_match}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo'
+      }, {
+          'testcase_name':
+              'tikz_match',
+          'text_in':
+              'Foo\\tikzsetnextfilename{test2}\n\\begin{tikzpicture}\n\\node (test) at (0,0) {Test1};\n\\end{tikzpicture}\nFoo',
+          'figures_in': ['ext_tikz/test1.pdf', 'ext_tikz/test2.pdf'],
+          'true_output':
+              'Foo\\includegraphics{ext_tikz/test2.pdf}\nFoo'
+      })
   def test_replace_tikzpictures(self, text_in, figures_in, true_output):
     self.assertEqual(
         arxiv_latex_cleaner._replace_tikzpictures(text_in, figures_in),

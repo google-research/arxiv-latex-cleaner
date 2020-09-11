@@ -23,8 +23,9 @@ arxiv_latex_cleaner /path/to/latex --config cleaner_config.yaml
 pip install arxiv-latex-cleaner
 ```
 
-| :exclamation:  arxiv_latex_cleaner is only compatible with Python >=3  :exclamation: |
-|--------------------------------------------------------------------------------------|
+| :exclamation: arxiv_latex_cleaner is only compatible with Python >=3 |
+: \:exclamation\:                                                      :
+| -------------------------------------------------------------------- |
 
 Alternatively, you can download the source code:
 
@@ -50,7 +51,8 @@ python setup.py install
     and `\iffalse\fi` environments.
 *   Optionally removes user-defined commands entered with `commands_to_delete`
     (such as `\todo{}` that you redefine as the empty string at the end).
-*   Optionally allows you to define custom regex replacement rules through a `cleaner_config.yaml` file.
+*   Optionally allows you to define custom regex replacement rules through a
+    `cleaner_config.yaml` file.
 
 #### Size-oriented
 
@@ -69,22 +71,27 @@ There is a 50MB limit on arXiv submissions, so to make it fit:
 
 #### TikZ picture source code concealment
 
-To prevent the upload of tikzpicture source code or raw simulation
-data, this feature:
+To prevent the upload of tikzpicture source code or raw simulation data, this
+feature:
 
-*   Replaces the tikzpicture environment `\begin{tikzpicture} ... \end{tikzpicture}`
-    with the respective `\includegraphics{EXTERNAL_TIKZ_FOLDER/picture_name.pdf}`.
-*   Requires externally compiled TikZ pictures as `.pdf` files in folder `EXTERNAL_TIKZ_FOLDER`.
-    See section 53 in the [PGF/TikZ manual](https://ctan.org/pkg/pgf?lang=en) on TikZ picture externalization.
-*   Only replaces environments with preceding `\tikzsetnextfilename{picture_name}` command
-    (as in `\tikzsetnextfilename{picture_name}\begin{tikzpicture} ... \end{tikzpicture}`) where
-    the externalized `picture_name.pdf` filename matches `picture_name`.
-
+*   Replaces the tikzpicture environment `\begin{tikzpicture} ...
+    \end{tikzpicture}` with the respective
+    `\includegraphics{EXTERNAL_TIKZ_FOLDER/picture_name.pdf}`.
+*   Requires externally compiled TikZ pictures as `.pdf` files in folder
+    `EXTERNAL_TIKZ_FOLDER`. See section 53 in the
+    [PGF/TikZ manual](https://ctan.org/pkg/pgf?lang=en) on TikZ picture
+    externalization.
+*   Only replaces environments with preceding
+    `\tikzsetnextfilename{picture_name}` command (as in
+    `\tikzsetnextfilename{picture_name}\begin{tikzpicture} ...
+    \end{tikzpicture}`) where the externalized `picture_name.pdf` filename
+    matches `picture_name`.
 
 #### More sophisticated pattern replacement based on regex group captures
 
-Sometimes it is useful to work with a set of custom latex commands when writing a paper.
-To get rid of them upon arXiv submission, one can simply revert them to plain latex with a regex insertion.
+Sometimes it is useful to work with a set of custom LaTeX commands when writing
+a paper. To get rid of them upon arXiv submission, one can simply revert them to
+plain LaTeX with a regular expression insertion.
 
 ```yaml
 {
@@ -94,11 +101,16 @@ To get rid of them upon arXiv submission, one can simply revert them to plain la
 }
 ```
 
-The pattern above will find all `\figcomp{path}{w1}{w2}` commands and replace them with
+The pattern above will find all `\figcomp{path}{w1}{w2}` commands and replace
+them with
 `\parbox[c]{w1\linewidth}{\includegraphics[width=w2\linewidth]{figures/path}}`.
-Note that the insertion template is filled with the [named groups captures](https://docs.python.org/3/library/re.html#regular-expression-examples) from the pattern.
-Note that the replacement is processed **before** all `\includegraphics` commands are processed and corresponding file paths are copied, making sure all figure files are copied to the cleaned version.
-See also [cleaner_config.yaml](cleaner_config.yaml) for details on how to specify the patterns.
+Note that the insertion template is filled with the
+[named groups captures](https://docs.python.org/3/library/re.html#regular-expression-examples)
+from the pattern. Note that the replacement is processed **before** all
+`\includegraphics` commands are processed and corresponding file paths are
+copied, making sure all figure files are copied to the cleaned version. See also
+[cleaner_config.yaml](cleaner_config.yaml) for details on how to specify the
+patterns.
 
 ## Usage:
 
@@ -141,7 +153,7 @@ optional arguments:
                         Folder (relative to input folder) containing
                         externalized TikZ figures in PDF format.
   --verbose             Enable detailed output.
-  --config CONFIG_PATH  
+  --config CONFIG_PATH
                         Read Settings from config file, such as "cleaner_config.yaml"
 ```
 
