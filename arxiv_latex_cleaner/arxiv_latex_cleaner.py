@@ -14,10 +14,13 @@
 # limitations under the License.
 """Cleans the LaTeX code of your paper to submit to arXiv."""
 import collections
+
+import copy
 import os
 import re
 import shutil
 import subprocess
+import logging
 
 from PIL import Image
 
@@ -184,8 +187,8 @@ def _remove_comments(content, parameters):
 
 
 def _replace_tikzpictures(content, figures):
-  """Replaces all tikzpicture environments (with includegraphic commands of
-
+  """
+    Replaces all tikzpicture environments (with includegraphic commands of
     external PDF figures) in the content, and writes it.
   """
 
@@ -283,7 +286,7 @@ def _keep_only_referenced(filenames, contents):
 
 
 def _keep_only_referenced_tex(contents, splits):
-  """Returns the filenames referenced from the tex files themselves
+  """Returns the filenames referenced from the tex files themselves.
 
   It needs various iterations in case one file is referenced from an
   unreferenced file.
@@ -348,7 +351,7 @@ def _split_all_files(parameters):
   file_splits['non_tex_not_in_root'] = _remove_pattern(
       file_splits['to_copy_not_in_root'], ['.tex$', '.tikz$'])
 
-  if parameters['use_external_tikz'] is not None:
+  if parameters.get('use_external_tikz', None) is not None:
     file_splits['external_tikz_figures'] = _keep_pattern(
         file_splits['all'], [parameters['use_external_tikz']])
   else:
@@ -377,18 +380,22 @@ def run_arxiv_cleaner(parameters):
       'figures_to_copy_if_referenced': ['.png$', '.jpg$', '.jpeg$', '.pdf$']
   })
 
+  logging.info('Collecting file structure.')
   parameters['output_folder'] = _create_out_folder(parameters['input_folder'])
 
   splits = _split_all_files(parameters)
 
+  logging.info('Reading all tex files')
   tex_contents = _read_all_tex_contents(
       splits['tex_in_root'] + splits['tex_not_in_root'], parameters)
 
   for tex_file in tex_contents:
+    logging.info('Removing comments in file %s.', tex_file)
     tex_contents[tex_file] = _remove_comments(tex_contents[tex_file],
                                               parameters)
 
   for tex_file in tex_contents:
+    logging.info('Replacing Tikz Pictures in file %s.', tex_file)
     content = _replace_tikzpictures(tex_contents[tex_file],
                                     splits['external_tikz_figures'])
     # If file ends with '\n' already, the split in last line would add an extra
@@ -399,13 +406,89 @@ def run_arxiv_cleaner(parameters):
   _add_root_tex_files(splits)
 
   for tex_file in splits['tex_to_copy']:
-    _write_file_content('\n'.join(tex_contents[tex_file]),
-                        os.path.join(parameters['output_folder'], tex_file))
+    logging.info('Replacing patterns in file %s.', tex_file)
+    content = '\n'.join(tex_contents[tex_file])
+    content = _find_and_replace_patterns(
+        content, parameters.get('patterns_and_insertions', list()))
+    tex_contents[tex_file] = content
+    new_path = os.path.join(parameters['output_folder'], tex_file)
+    logging.info('Writing modified contents to %s.', new_path)
+    _write_file_content(
+        content,
+        new_path,
+    )
 
   full_content = '\n'.join(
       ''.join(tex_contents[fn]) for fn in splits['tex_to_copy'])
   _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
   for non_tex_file in splits['non_tex_in_root']:
+    logging.info('Copying non-tex file %s.', non_tex_file)
     _copy_file(non_tex_file, parameters)
 
   _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
+  logging.info('Outputs written to %s', parameters['output_folder'])
+
+
+def strip_whitespace(text):
+  """Strips all whitespace characters.
+
+  https://stackoverflow.com/questions/8270092/remove-all-whitespace-in-a-string
+  """
+  pattern = re.compile(r'\s+')
+  text = re.sub(pattern, '', text)
+  return text
+
+
+def merge_args_into_config(args, config_params):
+  final_args = copy.deepcopy(config_params)
+  config_keys = config_params.keys()
+  for key, value in args.items():
+    if key in config_keys:
+      if any([isinstance(value, t) for t in [str, bool, float, int]]):
+        # overwrite config value with args value
+        final_args[key] = value
+      elif isinstance(value, list):
+        # append args values to config values
+        final_args[key] = value + config_params[key]
+      elif isinstance(value, dict):
+        # update config params with args params
+        final_args[key].update(**value)
+    else:
+      final_args[key] = value
+  return final_args
+
+
+def _find_and_replace_patterns(content, patterns_and_insertions):
+  r"""
+
+    content: str
+    patterns_and_insertions: List[Dict]
+
+    Example for patterns_and_insertions:
+
+        [
+            {
+                "pattern" :
+                r"(?:\\figcompfigures{\s*)(?P<first>.*?)\s*}\s*{\s*(?P<second>.*?)\s*}\s*{\s*(?P<third>.*?)\s*}",
+                "insertion" :
+                r"\parbox[c]{{{second}\linewidth}}{{\includegraphics[width={third}\linewidth]{{figures/{first}}}}}}",
+                "description": "Replace figcompfigures"
+            },
+        ]
+  """
+  for pattern_and_insertion in patterns_and_insertions:
+    pattern = pattern_and_insertion['pattern']
+    insertion = pattern_and_insertion['insertion']
+    description = pattern_and_insertion['description']
+    logging.info('Processing pattern: %s.', description)
+    p = re.compile(pattern)
+    m = p.search(content)
+    while m is not None:
+      local_insertion = insertion.format(**m.groupdict())
+      local_insertion = strip_whitespace(local_insertion)
+      logging.info(f'Found {content[m.start():m.end()]:<70}')
+      logging.info(f'Replacing with {local_insertion:<30}')
+      content = content[:m.start()] + local_insertion + content[m.end():]
+      m = p.search(content)
+    logging.info('Finished pattern: %s.', description)
+  return content

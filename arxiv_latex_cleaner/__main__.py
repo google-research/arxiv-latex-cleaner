@@ -12,20 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""
-Main module for ``arxiv_latex_cleaner``
+"""Main module for ``arxiv_latex_cleaner``.
 
 .. code-block:: bash
 
     $ python -m arxiv_latex_cleaner --help
 """
-
-from ._version import __version__
-from .arxiv_latex_cleaner import run_arxiv_cleaner
-
 import argparse
 import json
+import logging
+
+from ._version import __version__
+from .arxiv_latex_cleaner import merge_args_into_config
+from .arxiv_latex_cleaner import run_arxiv_cleaner
+
+import yaml
 
 PARSER = argparse.ArgumentParser(
     prog="arxiv_latex_cleaner@{0}".format(__version__),
@@ -34,8 +35,7 @@ PARSER = argparse.ArgumentParser(
 )
 
 PARSER.add_argument(
-    "input_folder", type=str, help="Input folder containing the LaTeX code."
-)
+    "input_folder", type=str, help="Input folder containing the LaTeX code.")
 
 PARSER.add_argument(
     "--resize_images",
@@ -84,9 +84,39 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
-    "--use_external_tikz", type=str, help="Folder (relative to input folder) containing externalized tikz figures in PDF format."
+    "--config",
+    type=str,
+    help=("Read settings from `.yaml` config file. If command line arguments "
+          "are provided additionally, the config file parameters are updated "
+          "with the command line parameters."),
+    required=False,
+)
+
+PARSER.add_argument(
+    "--verbose",
+    action="store_true",
+    help="Enable detailed output.",
 )
 
 ARGS = vars(PARSER.parse_args())
-run_arxiv_cleaner(ARGS)
+
+if ARGS["config"] is not None:
+  try:
+    with open(ARGS["config"], "r") as config_file:
+      config_params = yaml.safe_load(config_file)
+    final_args = merge_args_into_config(ARGS, config_params)
+
+  except FileNotFoundError:
+    print(f"config file {ARGS.config} not found.")
+    final_args = ARGS
+    final_args.pop("config", None)
+else:
+  final_args = ARGS
+
+if final_args.get("verbose", False):
+  logging.basicConfig(level=logging.INFO)
+else:
+  logging.basicConfig(level=logging.ERROR)
+
+run_arxiv_cleaner(final_args)
 exit(0)

@@ -1,0 +1,17 @@
+patterns_and_insertions:
+    [
+        # Use single ticks for regex patterns
+        # http://blogs.perl.org/users/tinita/2018/03/strings-in-yaml---to-quote-or-not-to-quote.html
+        # You need to escape \ with \\ in the pattern, for instance for \\todo
+        # Use Python named groups https://docs.python.org/3/library/re.html#regular-expression-examples
+        # Escape {{ and }} in the insertion expression
+        {
+            "pattern" : '(?:\\figcomp{\s*)(?P<first>.*?)\s*}\s*{\s*(?P<second>.*?)\s*}\s*{\s*(?P<third>.*?)\s*}',
+            "insertion" : '\parbox[c]{{ {second} \linewidth}} {{ \includegraphics[width= {third} \linewidth]{{figures/{first} }} }}',
+            "description" : "Replace figcomp"
+        },
+    ]
+verbose: False
+commands_to_delete: [
+    '\\todo',
+]
