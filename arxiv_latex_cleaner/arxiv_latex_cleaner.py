@@ -372,12 +372,14 @@ def run_arxiv_cleaner(parameters):
   """Core of the code, runs the actual arXiv cleaner."""
   parameters.update({
       'to_delete': [
-          '.aux$', '.sh$', '.bib$', '.blg$', '.brf$', '.log$', '.out$', '.ps$',
-          '.dvi$', '.synctex.gz$', '~$', '.backup$', '.gitignore$',
-          '.DS_Store$', '.svg$', '^.idea', '.dpth$', '.md5$', '.dep$',
-          '.auxlock$'
+          r'\.aux$', r'\.sh$', r'\.bib$', r'\.blg$', r'\.brf$', r'\.log$',
+          r'\.out$', r'\.ps$', r'\.dvi$', r'\.synctex.gz$', '~$', r'\.backup$',
+          r'\.gitignore$', r'\.DS_Store$', r'\.svg$', r'^\.idea', r'\.dpth$',
+          r'\.md5$', r'\.dep$', r'\.auxlock$'
       ],
-      'figures_to_copy_if_referenced': ['.png$', '.jpg$', '.jpeg$', '.pdf$']
+      'figures_to_copy_if_referenced': [
+          r'\.png$', r'\.jpg$', r'\.jpeg$', r'\.pdf$'
+      ]
   })
 
   logging.info('Collecting file structure.')

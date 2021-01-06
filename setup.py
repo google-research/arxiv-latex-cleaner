@@ -17,7 +17,6 @@
 
 from setuptools import setup
 from setuptools import find_packages
-from os import path
 
 from arxiv_latex_cleaner._version import __version__
 
