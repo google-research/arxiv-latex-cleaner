@@ -84,6 +84,13 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--use_external_tikz",
+    type=str,
+    help="Folder (relative to input folder) containing externalized tikz "
+         "figures in PDF format."
+)
+
+PARSER.add_argument(
     "--config",
     type=str,
     help=("Read settings from `.yaml` config file. If command line arguments "
