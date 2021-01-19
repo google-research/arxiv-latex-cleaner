@@ -482,12 +482,14 @@ def _find_and_replace_patterns(content, patterns_and_insertions):
     pattern = pattern_and_insertion['pattern']
     insertion = pattern_and_insertion['insertion']
     description = pattern_and_insertion['description']
+    strip = pattern_and_insertion.get('strip_whitespace', True)
     logging.info('Processing pattern: %s.', description)
     p = re.compile(pattern)
     m = p.search(content)
     while m is not None:
       local_insertion = insertion.format(**m.groupdict())
-      local_insertion = strip_whitespace(local_insertion)
+      if strip:
+        local_insertion = strip_whitespace(local_insertion)
       logging.info(f'Found {content[m.start():m.end()]:<70}')
       logging.info(f'Replacing with {local_insertion:<30}')
       content = content[:m.start()] + local_insertion + content[m.end():]
