@@ -13,7 +13,7 @@ patterns_and_insertions:
             "pattern" : '(?:\\figcomp{\s*)(?P<first>.*?)\s*}\s*{\s*(?P<second>.*?)\s*}\s*{\s*(?P<third>.*?)\s*}',
             "insertion" : '\parbox[c]{{ {second} \linewidth}} {{ \includegraphics[width= {third} \linewidth]{{figures/{first} }} }}',
             "description" : "Replace figcomp",
-            #"strip_whitespace": n 
+            # "strip_whitespace": n 
         },
     ]
 verbose: False
