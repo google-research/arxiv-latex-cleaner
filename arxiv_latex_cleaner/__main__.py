@@ -75,6 +75,12 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--keep_bib",
+    action="store_true",
+    help="Avoid deleting the *.bib files.",
+)
+
+PARSER.add_argument(
     "--commands_to_delete",
     nargs="+",
     default=[],
