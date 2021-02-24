@@ -114,13 +114,14 @@ patterns.
 ## Usage:
 
 ```
-usage: arxiv_latex_cleaner@v0.1.13 [-h] [--resize_images] [--im_size IM_SIZE]
+usage: arxiv_latex_cleaner@v0.1.14 [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
                                    [--images_whitelist IMAGES_WHITELIST]
+                                   [--keep_bib]
                                    [--commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]]
-                                   [--verbose]
-                                   [--config CONFIG_PATH]
+                                   [--use_external_tikz USE_EXTERNAL_TIKZ]
+                                   [--config CONFIG] [--verbose]
                                    input_folder
 
 Clean the LaTeX code of your paper to submit to arXiv. Check the README for
@@ -145,15 +146,18 @@ optional arguments:
                         for images, and dpi forPDFs, as in --im_size and
                         --pdf_im_resolution, respectively. Format is a
                         dictionary as: '{"path/to/im.jpg": 1000}'
+  --keep_bib            Avoid deleting the *.bib files.
   --commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]
                         LaTeX commands that will be deleted. Useful for e.g.
                         user-defined \todo commands.
-  --use_external_tikz EXTERNAL_TIKZ_FOLDER
+  --use_external_tikz USE_EXTERNAL_TIKZ
                         Folder (relative to input folder) containing
-                        externalized TikZ figures in PDF format.
+                        externalized tikz figures in PDF format.
+  --config CONFIG       Read settings from `.yaml` config file. If command
+                        line arguments are provided additionally, the config
+                        file parameters are updated with the command line
+                        parameters.
   --verbose             Enable detailed output.
-  --config CONFIG_PATH
-                        Read Settings from config file, such as "cleaner_config.yaml"
 ```
 
 ## Note

@@ -371,16 +371,19 @@ def _create_out_folder(input_folder):
 def run_arxiv_cleaner(parameters):
   """Core of the code, runs the actual arXiv cleaner."""
 
-  files_to_delete = [r'\.aux$', r'\.sh$', r'\.blg$', r'\.brf$', r'\.log$',
-                     r'\.out$', r'\.ps$', r'\.dvi$', r'\.synctex.gz$', '~$', r'\.backup$',
-                     r'\.gitignore$', r'\.DS_Store$', r'\.svg$', r'^\.idea', r'\.dpth$',
-                     r'\.md5$', r'\.dep$', r'\.auxlock$']
+  files_to_delete = [
+      r'\.aux$', r'\.sh$', r'\.blg$', r'\.brf$', r'\.log$', r'\.out$', r'\.ps$',
+      r'\.dvi$', r'\.synctex.gz$', '~$', r'\.backup$', r'\.gitignore$',
+      r'\.DS_Store$', r'\.svg$', r'^\.idea', r'\.dpth$', r'\.md5$', r'\.dep$',
+      r'\.auxlock$'
+  ]
 
   if not parameters['keep_bib']:
     files_to_delete.append(r'\.bib$')
 
   parameters.update({
-      'to_delete': files_to_delete,
+      'to_delete':
+          files_to_delete,
       'figures_to_copy_if_referenced': [
           r'\.png$', r'\.jpg$', r'\.jpeg$', r'\.pdf$'
       ]
