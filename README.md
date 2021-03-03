@@ -3,7 +3,8 @@
 This tool allows you to easily clean the LaTeX code of your paper to submit to
 arXiv. From a folder containing all your code, e.g. `/path/to/latex/`, it
 creates a new folder `/path/to/latex_arXiv/`, that is ready to ZIP and upload to
-arXiv.
+arXiv. On Linux, if you call it with `.` as input directory, the new folder
+will be the hidden folder `._arXiv` inside the source folder.
 
 ## Example call:
 
