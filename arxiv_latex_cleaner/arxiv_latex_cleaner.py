@@ -362,7 +362,7 @@ def _split_all_files(parameters):
 
 def _create_out_folder(input_folder):
   """Creates the output folder, erasing it if existed."""
-  out_folder = input_folder.rstrip(os.sep) + '_arXiv'
+  out_folder = os.path.abspath(input_folder) + '_arXiv'
   _create_dir_erase_if_exists(out_folder)
 
   return out_folder

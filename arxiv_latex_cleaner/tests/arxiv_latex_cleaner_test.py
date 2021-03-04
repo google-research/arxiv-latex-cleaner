@@ -342,7 +342,8 @@ class IntegrationTests(unittest.TestCase):
         'compress_pdf': False,
         'pdf_im_resolution': 500,
         'commands_to_delete': ['mytodo'],
-        'use_external_tikz': 'ext_tikz'
+        'use_external_tikz': 'ext_tikz',
+        'keep_bib': False
     })
 
     # Checks the set of files is the same as in the true folder.

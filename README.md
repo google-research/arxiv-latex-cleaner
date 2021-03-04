@@ -160,6 +160,12 @@ optional arguments:
   --verbose             Enable detailed output.
 ```
 
+## Testing:
+
+```
+python -m unittest arxiv_latex_cleaner.tests.arxiv_latex_cleaner_test
+```
+
 ## Note
 
 This is not an officially supported Google product.
