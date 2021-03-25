@@ -159,10 +159,10 @@ def _remove_comments_inline(text):
 
 def _strip_tex_contents(lines, end_str):
   """Removes everything after end_str."""
-    for i in range(len(lines)):
-      if end_str in lines[i]:
-        return lines[:i+1]
-    return lines
+  for i in range(len(lines)):
+    if end_str in lines[i]:
+      return lines[:i+1]
+  return lines
 
 
 def _read_file_content(filename):
