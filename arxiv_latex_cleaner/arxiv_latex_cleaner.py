@@ -104,9 +104,22 @@ def _remove_command(text, command):
   https://stackoverflow.com/questions/546433/regular-expression-to-match-balanced-parentheses/35271017#35271017
   """
   base_pattern = r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}'
-  # In case there are only spaces up to the newline, adds a percent, not to alter the newlines.
-  new_text = re.sub(base_pattern + r'(?=[ \t]*\n)', '%', text)
-  return re.sub(base_pattern, '', new_text)
+  all_substitutions = []
+  for match in re.finditer(base_pattern, text):
+    # In case there are only spaces or nothing up to the following newline, adds a percent, not to alter the newlines.
+    new_substring = ''
+    if match.span()[1] < len(text):
+      next_newline = text[match.span()[1]:].find('\n')
+      if next_newline != -1:
+        text_until_newline = text[match.span()[1]:match.span()[1]+next_newline]
+        if text_until_newline == '' or text_until_newline.isspace():
+          new_substring = '%'
+    all_substitutions.append((match.span()[0], match.span()[1], new_substring))
+
+  for (start, end, new_substring) in reversed(all_substitutions):
+    text = text[:start] + new_substring + text[end:]
+
+  return text
 
 
 def _remove_environment(text, environment):
@@ -120,7 +133,7 @@ def _remove_iffalse_block(text):
   """Removes possibly nested r'\iffalse*\fi' blocks from 'text'."""
   p = re.compile(r'\\if(\w+)|\\fi')
   level = -1
-  positions_to_del = []
+  positions_to_delete = []
   start, end = 0, 0
   for m in p.finditer(text):
     if m.group() == r'\iffalse' and level == -1:
@@ -131,12 +144,12 @@ def _remove_iffalse_block(text):
     elif m.group() == r'\fi' and level >= 0:
       if level == 0:
         end = m.end()
-        positions_to_del.append((start, end))
+        positions_to_delete.append((start, end))
       level -= 1
     else:
       pass
 
-  for (start, end) in reversed(positions_to_del):
+  for (start, end) in reversed(positions_to_delete):
     if end < len(text) and text[end].isspace():
       end_to_del = end + 1
     else:
