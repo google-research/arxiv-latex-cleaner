@@ -100,11 +100,13 @@ def _copy_file(filename, params):
 def _remove_command(text, command):
   """Removes '\\command{*}' from the string 'text'.
 
-  Regex expression used to match balanced parentheses taken from:
+  Regex `base_pattern` used to match balanced parentheses taken from:
   https://stackoverflow.com/questions/546433/regular-expression-to-match-balanced-parentheses/35271017#35271017
   """
-  return re.sub(r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}', '',
-                text)
+  base_pattern = r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}'
+  # In case there are only spaces up to the newline, adds a percent, not to alter the newlines.
+  new_text = re.sub(base_pattern + r'(?=[ \t]*\n)', '%', text)
+  return re.sub(base_pattern, '', new_text)
 
 
 def _remove_environment(text, environment):
@@ -161,7 +163,7 @@ def _strip_tex_contents(lines, end_str):
   """Removes everything after end_str."""
   for i in range(len(lines)):
     if end_str in lines[i]:
-      return lines[:i+1]
+      return lines[:i + 1]
   return lines
 
 
@@ -186,7 +188,7 @@ def _write_file_content(content, filename):
     return fp.write(content)
 
 
-def _remove_comments(content, parameters):
+def _remove_comments_and_commands_to_delete(content, parameters):
   """Erases all LaTeX comments in the content, and writes it."""
   content = [_remove_comments_inline(line) for line in content]
   content = _remove_environment(''.join(content), 'comment')
@@ -410,8 +412,8 @@ def run_arxiv_cleaner(parameters):
 
   for tex_file in tex_contents:
     logging.info('Removing comments in file %s.', tex_file)
-    tex_contents[tex_file] = _remove_comments(tex_contents[tex_file],
-                                              parameters)
+    tex_contents[tex_file] = _remove_comments_and_commands_to_delete(
+        tex_contents[tex_file], parameters)
 
   for tex_file in tex_contents:
     logging.info('Replacing Tikz Pictures in file %s.', tex_file)
@@ -464,13 +466,13 @@ def merge_args_into_config(args, config_params):
   for key, value in args.items():
     if key in config_keys:
       if any([isinstance(value, t) for t in [str, bool, float, int]]):
-        # overwrite config value with args value
+        # Overwrites config value with args value.
         final_args[key] = value
       elif isinstance(value, list):
-        # append args values to config values
+        # Appends args values to config values.
         final_args[key] = value + config_params[key]
       elif isinstance(value, dict):
-        # update config params with args params
+        # Updates config params with args params.
         final_args[key].update(**value)
     else:
       final_args[key] = value
@@ -499,13 +501,12 @@ def _find_and_replace_patterns(content, patterns_and_insertions):
     pattern = pattern_and_insertion['pattern']
     insertion = pattern_and_insertion['insertion']
     description = pattern_and_insertion['description']
-    strip = pattern_and_insertion.get('strip_whitespace', True)
     logging.info('Processing pattern: %s.', description)
     p = re.compile(pattern)
     m = p.search(content)
     while m is not None:
       local_insertion = insertion.format(**m.groupdict())
-      if strip:
+      if pattern_and_insertion.get('strip_whitespace', True):
         local_insertion = strip_whitespace(local_insertion)
       logging.info(f'Found {content[m.start():m.end()]:<70}')
       logging.info(f'Replacing with {local_insertion:<30}')

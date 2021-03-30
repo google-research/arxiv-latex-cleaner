@@ -163,9 +163,13 @@ class UnitTests(parameterized.TestCase):
           'text_in': '\\textit{Foo\nFoo2}\n',
           'true_output': '\\textit{Foo\nFoo2}\n'
       }, {
-          'testcase_name': 'command_removed',
-          'text_in': 'A\\todo{B\nC}\nD\n\\end{document}',
-          'true_output': 'A\nD\n\\end{document}'
+          'testcase_name': 'command_no_end_line_removed',
+          'text_in': 'A\\todo{B\nC}D\nE\n\\end{document}',
+          'true_output': 'AD\nE\n\\end{document}'
+      }, {
+          'testcase_name': 'command_with_end_line_removed',
+          'text_in': 'A\n\\todo{B\nC}\nD\n\\end{document}',
+          'true_output': 'A\n%\nD\n\\end{document}'
       })
   def test_remove_command(self, text_in, true_output):
     self.assertEqual(
