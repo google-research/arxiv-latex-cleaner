@@ -114,7 +114,7 @@ patterns.
 ## Usage:
 
 ```
-usage: arxiv_latex_cleaner@v0.1.18 [-h] [--resize_images] [--im_size IM_SIZE]
+usage: arxiv_latex_cleaner@v0.1.19 [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
                                    [--images_whitelist IMAGES_WHITELIST]
@@ -149,7 +149,13 @@ optional arguments:
   --keep_bib            Avoid deleting the *.bib files.
   --commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]
                         LaTeX commands that will be deleted. Useful for e.g.
-                        user-defined \todo commands.
+                        user-defined \todo commands. For example, to delete
+                        all occurrences of \todo1{} and \todo2{}, run the tool
+                        with `--commands_to_delete todo1 todo2`.Please note
+                        that the positional argument `input_folder` cannot
+                        come immediately after `commands_to_delete`, as the
+                        parser does not have any way to know if it's another
+                        command to delete.
   --use_external_tikz USE_EXTERNAL_TIKZ
                         Folder (relative to input folder) containing
                         externalized tikz figures in PDF format.

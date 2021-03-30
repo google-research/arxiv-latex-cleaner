@@ -85,8 +85,13 @@ PARSER.add_argument(
     nargs="+",
     default=[],
     required=False,
-    help=("LaTeX commands that will be deleted. Useful for e.g. user-defined "
-          "\\todo commands."),
+    help=(
+        "LaTeX commands that will be deleted. Useful for e.g. user-defined "
+        "\\todo commands. For example, to delete all occurrences of \\todo1{} "
+        "and \\todo2{}, run the tool with `--commands_to_delete todo1 todo2`."
+        "Please note that the positional argument `input_folder` cannot come "
+        "immediately after `commands_to_delete`, as the parser does not have "
+        "any way to know if it's another command to delete."),
 )
 
 PARSER.add_argument(
