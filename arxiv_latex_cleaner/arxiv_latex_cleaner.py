@@ -122,10 +122,10 @@ def _remove_command(text, command):
   return text
 
 
-def _remove_environment(text, environment):
-  """Removes '\\begin{environment}*\\end{environment}' from 'text'."""
+def _remove_environment(text, env):
+  """Removes '\\begin{env}*\\end{env}' from 'text'."""
   return re.sub(
-      r'\\begin{' + environment + r'}[\s\S]*?\\end{' + environment + r'}', '',
+      r'\\begin{' + env + r'}[\s\S]*?\\end{' + env + r'}', '',
       text)
 
 
@@ -208,6 +208,8 @@ def _remove_comments_and_commands_to_delete(content, parameters):
   content = _remove_iffalse_block(content)
   for command in parameters['commands_to_delete']:
     content = _remove_command(content, command)
+  for env in parameters['environments_to_delete']:
+    content = _remove_environment(''.join(content), env)
   return content
 
 
