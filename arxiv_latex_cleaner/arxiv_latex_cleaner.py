@@ -136,7 +136,7 @@ def _remove_iffalse_block(text):
   positions_to_delete = []
   start, end = 0, 0
   for m in p.finditer(text):
-    if m.group() == r'\iffalse' and level == -1:
+    if (m.group() == r'\iffalse' or m.group() == r'\if0') and level == -1:
       level += 1
       start = m.start()
     elif m.group().startswith(r'\if') and level >= 0:
