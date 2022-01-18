@@ -176,7 +176,10 @@ def _strip_tex_contents(lines, end_str):
   """Removes everything after end_str."""
   for i in range(len(lines)):
     if end_str in lines[i]:
-      return lines[:i + 1]
+      if '%' not in lines[i]:
+        return lines[:i + 1]
+      elif lines[i].index('%') > lines[i].index(end_str):
+        return lines[:i + 1]
   return lines
 
 
