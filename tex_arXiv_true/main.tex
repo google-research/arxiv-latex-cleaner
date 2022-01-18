@@ -1,3 +1,4 @@
+\begin{document}
 Text
 
 Text%
@@ -6,7 +7,29 @@ Text%
 This is a percent \%.
 \includegraphics{images/im1_included.png}
 
-This is a todo command
+This line should not be separated
+%
+from this one.
+
+\newif\ifvar
+
+\ifvar
+\fi
 
 
 \input{figures/figure_included.tex}
+
+\includegraphics{ext_tikz/test1.pdf}
+
+\input{figures/figure_included.tikz}
+
+\begin{tikzpicture}
+    \node (test) at (0,0) {Test3};
+\end{tikzpicture}
+
+\tikzsetnextfilename{test_no_match}
+\begin{tikzpicture}
+    \node (test) at (0,0) {Test4};
+\end{tikzpicture}
+
+\end{document}

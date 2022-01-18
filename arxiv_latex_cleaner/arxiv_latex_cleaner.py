@@ -14,18 +14,21 @@
 # limitations under the License.
 """Cleans the LaTeX code of your paper to submit to arXiv."""
 import collections
+
+import copy
 import os
 import re
 import shutil
 import subprocess
+import logging
 
 from PIL import Image
 
 PDF_RESIZE_COMMAND = (
     'gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH '
     '-dDownsampleColorImages=true -dColorImageResolution={resolution} '
-    '-dColorImageDownsampleThreshold=1.0 -sOutputFile={output} {input} '
-    '-dAutoRotatePages=/None')
+    '-dColorImageDownsampleThreshold=1.0 -dAutoRotatePages=/None '
+    '-sOutputFile={output} {input}')
 MAX_FILENAME_LENGTH = 120
 
 # Fix for Windows: Even if '\' (os.sep) is the standard way of making paths on
@@ -35,12 +38,10 @@ MAX_FILENAME_LENGTH = 120
 if os.name == 'nt':
   global old_os_path_join
 
-
   def new_os_join(path, *args):
     res = old_os_path_join(path, *args)
     res = res.replace('\\', '/')
     return res
-
 
   old_os_path_join = os.path.join
 
@@ -99,18 +100,64 @@ def _copy_file(filename, params):
 def _remove_command(text, command):
   """Removes '\\command{*}' from the string 'text'.
 
-  Regex expression used to match balanced parentheses taken from:
+  Regex `base_pattern` used to match balanced parentheses taken from:
   https://stackoverflow.com/questions/546433/regular-expression-to-match-balanced-parentheses/35271017#35271017
   """
-  return re.sub(r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}',
-                '', text)
+  base_pattern = r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}'
+  all_substitutions = []
+  for match in re.finditer(base_pattern, text):
+    # In case there are only spaces or nothing up to the following newline, adds a percent, not to alter the newlines.
+    new_substring = ''
+    if match.span()[1] < len(text):
+      next_newline = text[match.span()[1]:].find('\n')
+      if next_newline != -1:
+        text_until_newline = text[match.span()[1]:match.span()[1] +
+                                  next_newline]
+        if text_until_newline == '' or text_until_newline.isspace():
+          new_substring = '%'
+    all_substitutions.append((match.span()[0], match.span()[1], new_substring))
+
+  for (start, end, new_substring) in reversed(all_substitutions):
+    text = text[:start] + new_substring + text[end:]
+
+  return text
 
 
 def _remove_environment(text, environment):
   """Removes '\\begin{environment}*\\end{environment}' from 'text'."""
   return re.sub(
-      r'\\begin{' + environment + r'}[\s\S]*?\\end{' + environment + r'}',
-      '', text)
+      r'\\begin{' + environment + r'}[\s\S]*?\\end{' + environment + r'}', '',
+      text)
+
+
+def _remove_iffalse_block(text):
+  """Removes possibly nested r'\iffalse*\fi' blocks from 'text'."""
+  p = re.compile(r'\\if(\w+)|\\fi')
+  level = -1
+  positions_to_delete = []
+  start, end = 0, 0
+  for m in p.finditer(text):
+    if (m.group() == r'\iffalse' or m.group() == r'\if0') and level == -1:
+      level += 1
+      start = m.start()
+    elif m.group().startswith(r'\if') and level >= 0:
+      level += 1
+    elif m.group() == r'\fi' and level >= 0:
+      if level == 0:
+        end = m.end()
+        positions_to_delete.append((start, end))
+      level -= 1
+    else:
+      pass
+
+  for (start, end) in reversed(positions_to_delete):
+    if end < len(text) and text[end].isspace():
+      end_to_del = end + 1
+    else:
+      end_to_del = end
+    text = text[:start] + text[end_to_del:]
+
+  return text
 
 
 def _remove_comments_inline(text):
@@ -126,9 +173,22 @@ def _remove_comments_inline(text):
     return text
 
 
+def _strip_tex_contents(lines, end_str):
+  """Removes everything after end_str."""
+  for i in range(len(lines)):
+    if end_str in lines[i]:
+      if '%' not in lines[i]:
+        return lines[:i + 1]
+      elif lines[i].index('%') > lines[i].index(end_str):
+        return lines[:i + 1]
+  return lines
+
+
 def _read_file_content(filename):
-  with open(filename, 'r') as fp:
-    return fp.readlines()
+  with open(filename, 'r', encoding='utf-8') as fp:
+    lines = fp.readlines()
+    lines = _strip_tex_contents(lines, '\\end{document}')
+    return lines
 
 
 def _read_all_tex_contents(tex_files, parameters):
@@ -141,35 +201,53 @@ def _read_all_tex_contents(tex_files, parameters):
 
 def _write_file_content(content, filename):
   _create_dir_if_not_exists(os.path.dirname(filename))
-  with open(filename, 'w') as fp:
+  with open(filename, 'w', encoding='utf-8') as fp:
     return fp.write(content)
 
 
-def _remove_comments(content, parameters):
+def _remove_comments_and_commands_to_delete(content, parameters):
   """Erases all LaTeX comments in the content, and writes it."""
   content = [_remove_comments_inline(line) for line in content]
   content = _remove_environment(''.join(content), 'comment')
+  content = _remove_iffalse_block(content)
   for command in parameters['commands_to_delete']:
     content = _remove_command(content, command)
-  # If file ends with '\n' already, the split in last line would add an extra
-  # '\n', so we remove it.
-  return content.split('\n')
+  return content
 
 
-def _resize_and_copy_figure(filename,
-    origin_folder,
-    destination_folder,
-    resize_image,
-    image_size,
-    compress_pdf,
-    pdf_resolution):
+def _replace_tikzpictures(content, figures):
+  """
+    Replaces all tikzpicture environments (with includegraphic commands of
+    external PDF figures) in the content, and writes it.
+  """
+
+  def get_figure(matchobj):
+    found_tikz_filename = re.search(r'\\tikzsetnextfilename{(.*?)}',
+                                    matchobj.group(0)).group(1)
+    # search in tex split if figure is available
+    matching_tikz_filenames = _keep_pattern(
+        figures, ['/' + found_tikz_filename + '.pdf'])
+    if len(matching_tikz_filenames) == 1:
+      return '\\includegraphics{' + matching_tikz_filenames[0] + '}'
+    else:
+      return matchobj.group(0)
+
+  content = re.sub(r'\\tikzsetnextfilename{[\s\S]*?\\end{tikzpicture}',
+                   get_figure, content)
+
+  return content
+
+
+def _resize_and_copy_figure(filename, origin_folder, destination_folder,
+                            resize_image, image_size, compress_pdf,
+                            pdf_resolution):
   """Resizes and copies the input figure (either JPG, PNG, or PDF)."""
   _create_dir_if_not_exists(
       os.path.join(destination_folder, os.path.dirname(filename)))
 
-  if resize_image and os.path.splitext(filename)[1].lower() in ['.jpg',
-                                                                '.jpeg',
-                                                                '.png']:
+  if resize_image and os.path.splitext(filename)[1].lower() in [
+      '.jpg', '.jpeg', '.png'
+  ]:
     im = Image.open(os.path.join(origin_folder, filename))
     if max(im.size) > image_size:
       im = im.resize(
@@ -189,12 +267,15 @@ def _resize_and_copy_figure(filename,
         os.path.join(destination_folder, filename))
 
 
-def _resize_pdf_figure(filename, origin_folder, destination_folder, resolution,
-    timeout=10):
+def _resize_pdf_figure(filename,
+                       origin_folder,
+                       destination_folder,
+                       resolution,
+                       timeout=10):
   input_file = os.path.join(origin_folder, filename)
   output_file = os.path.join(destination_folder, filename)
-  bash_command = PDF_RESIZE_COMMAND.format(input=input_file, output=output_file,
-                                           resolution=resolution)
+  bash_command = PDF_RESIZE_COMMAND.format(
+      input=input_file, output=output_file, resolution=resolution)
   process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
 
   try:
@@ -225,8 +306,7 @@ def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
         resize_image=parameters['resize_images'],
         image_size=image_size[image_file],
         compress_pdf=parameters['compress_pdf'],
-        pdf_resolution=pdf_resolution[image_file]
-    )
+        pdf_resolution=pdf_resolution[image_file])
 
 
 def _search_reference(filename, contents, extension_optional):
@@ -245,7 +325,7 @@ def _keep_only_referenced(filenames, contents, extension_optional=True):
 
 
 def _keep_only_referenced_tex(contents, splits):
-  """Returns the filenames referenced from the tex files themselves
+  """Returns the filenames referenced from the tex files themselves.
 
   It needs various iterations in case one file is referenced from an
   unreferenced file.
@@ -280,8 +360,8 @@ def _split_all_files(parameters):
   """Splits the files into types or location to know what to do with them."""
   file_splits = {
       'all':
-        _list_all_files(
-            parameters['input_folder'], ignore_dirs=['.git' + os.sep]),
+          _list_all_files(
+              parameters['input_folder'], ignore_dirs=['.git' + os.sep]),
       'in_root': [
           f for f in os.listdir(parameters['input_folder'])
           if os.path.isfile(os.path.join(parameters['input_folder'], f))
@@ -301,21 +381,27 @@ def _split_all_files(parameters):
       file_splits['all'], parameters['figures_to_copy_if_referenced'])
 
   file_splits['tex_in_root'] = _keep_pattern(file_splits['to_copy_in_root'],
-                                             ['.tex$'])
+                                             ['.tex$', '.tikz$'])
   file_splits['tex_not_in_root'] = _keep_pattern(
-      file_splits['to_copy_not_in_root'], ['.tex$'])
+      file_splits['to_copy_not_in_root'], ['.tex$', '.tikz$'])
 
   file_splits['non_tex_in_root'] = _remove_pattern(
-      file_splits['to_copy_in_root'], ['.tex$'])
+      file_splits['to_copy_in_root'], ['.tex$', '.tikz$'])
   file_splits['non_tex_not_in_root'] = _remove_pattern(
-      file_splits['to_copy_not_in_root'], ['.tex$'])
+      file_splits['to_copy_not_in_root'], ['.tex$', '.tikz$'])
+
+  if parameters.get('use_external_tikz', None) is not None:
+    file_splits['external_tikz_figures'] = _keep_pattern(
+        file_splits['all'], [parameters['use_external_tikz']])
+  else:
+    file_splits['external_tikz_figures'] = []
 
   return file_splits
 
 
 def _create_out_folder(input_folder):
   """Creates the output folder, erasing it if existed."""
-  out_folder = input_folder.rstrip(os.sep) + '_arXiv'
+  out_folder = os.path.abspath(input_folder) + '_arXiv'
   _create_dir_erase_if_exists(out_folder)
 
   return out_folder
@@ -323,37 +409,135 @@ def _create_out_folder(input_folder):
 
 def run_arxiv_cleaner(parameters):
   """Core of the code, runs the actual arXiv cleaner."""
+
+  files_to_delete = [
+      r'\.aux$', r'\.sh$', r'\.blg$', r'\.brf$', r'\.log$', r'\.out$', r'\.ps$',
+      r'\.dvi$', r'\.synctex.gz$', '~$', r'\.backup$', r'\.gitignore$',
+      r'\.DS_Store$', r'\.svg$', r'^\.idea', r'\.dpth$', r'\.md5$', r'\.dep$',
+      r'\.auxlock$'
+  ]
+
+  if not parameters['keep_bib']:
+    files_to_delete.append(r'\.bib$')
+
   parameters.update({
-      'to_delete': [
-          '.aux$', '.sh$', '.bib$', '.blg$', '.brf$', '.log$', '.out$', '.ps$',
-          '.dvi$', '.synctex.gz$', '~$', '.backup$', '.gitignore$',
-          '.DS_Store$', '.svg$', '^.idea'
-      ],
-      'figures_to_copy_if_referenced': ['.png$', '.jpg$', '.jpeg$', '.pdf$']
+      'to_delete':
+          files_to_delete,
+      'figures_to_copy_if_referenced': [
+          r'\.png$', r'\.jpg$', r'\.jpeg$', r'\.pdf$'
+      ]
   })
 
+  logging.info('Collecting file structure.')
   parameters['output_folder'] = _create_out_folder(parameters['input_folder'])
 
   splits = _split_all_files(parameters)
 
+  logging.info('Reading all tex files')
   tex_contents = _read_all_tex_contents(
       splits['tex_in_root'] + splits['tex_not_in_root'], parameters)
 
   for tex_file in tex_contents:
-    tex_contents[tex_file] = _remove_comments(tex_contents[tex_file],
-                                              parameters)
+    logging.info('Removing comments in file %s.', tex_file)
+    tex_contents[tex_file] = _remove_comments_and_commands_to_delete(
+        tex_contents[tex_file], parameters)
+
+  for tex_file in tex_contents:
+    logging.info('Replacing Tikz Pictures in file %s.', tex_file)
+    content = _replace_tikzpictures(tex_contents[tex_file],
+                                    splits['external_tikz_figures'])
+    # If file ends with '\n' already, the split in last line would add an extra
+    # '\n', so we remove it.
+    tex_contents[tex_file] = content.split('\n')
 
   _keep_only_referenced_tex(tex_contents, splits)
   _add_root_tex_files(splits)
 
   for tex_file in splits['tex_to_copy']:
-    _write_file_content('\n'.join(tex_contents[tex_file]),
-                        os.path.join(parameters['output_folder'], tex_file))
+    logging.info('Replacing patterns in file %s.', tex_file)
+    content = '\n'.join(tex_contents[tex_file])
+    content = _find_and_replace_patterns(
+        content, parameters.get('patterns_and_insertions', list()))
+    tex_contents[tex_file] = content
+    new_path = os.path.join(parameters['output_folder'], tex_file)
+    logging.info('Writing modified contents to %s.', new_path)
+    _write_file_content(
+        content,
+        new_path,
+    )
 
-  full_content = '\n'.join(''.join(tex_contents[fn]) for fn in
-                           splits['tex_to_copy'])
+  full_content = '\n'.join(
+      ''.join(tex_contents[fn]) for fn in splits['tex_to_copy'])
   _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
   for non_tex_file in splits['non_tex_in_root']:
+    logging.info('Copying non-tex file %s.', non_tex_file)
     _copy_file(non_tex_file, parameters)
 
   _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
+  logging.info('Outputs written to %s', parameters['output_folder'])
+
+
+def strip_whitespace(text):
+  """Strips all whitespace characters.
+
+  https://stackoverflow.com/questions/8270092/remove-all-whitespace-in-a-string
+  """
+  pattern = re.compile(r'\s+')
+  text = re.sub(pattern, '', text)
+  return text
+
+
+def merge_args_into_config(args, config_params):
+  final_args = copy.deepcopy(config_params)
+  config_keys = config_params.keys()
+  for key, value in args.items():
+    if key in config_keys:
+      if any([isinstance(value, t) for t in [str, bool, float, int]]):
+        # Overwrites config value with args value.
+        final_args[key] = value
+      elif isinstance(value, list):
+        # Appends args values to config values.
+        final_args[key] = value + config_params[key]
+      elif isinstance(value, dict):
+        # Updates config params with args params.
+        final_args[key].update(**value)
+    else:
+      final_args[key] = value
+  return final_args
+
+
+def _find_and_replace_patterns(content, patterns_and_insertions):
+  r"""
+
+    content: str
+    patterns_and_insertions: List[Dict]
+
+    Example for patterns_and_insertions:
+
+        [
+            {
+                "pattern" :
+                r"(?:\\figcompfigures{\s*)(?P<first>.*?)\s*}\s*{\s*(?P<second>.*?)\s*}\s*{\s*(?P<third>.*?)\s*}",
+                "insertion" :
+                r"\parbox[c]{{{second}\linewidth}}{{\includegraphics[width={third}\linewidth]{{figures/{first}}}}}}",
+                "description": "Replace figcompfigures"
+            },
+        ]
+  """
+  for pattern_and_insertion in patterns_and_insertions:
+    pattern = pattern_and_insertion['pattern']
+    insertion = pattern_and_insertion['insertion']
+    description = pattern_and_insertion['description']
+    logging.info('Processing pattern: %s.', description)
+    p = re.compile(pattern)
+    m = p.search(content)
+    while m is not None:
+      local_insertion = insertion.format(**m.groupdict())
+      if pattern_and_insertion.get('strip_whitespace', True):
+        local_insertion = strip_whitespace(local_insertion)
+      logging.info(f'Found {content[m.start():m.end()]:<70}')
+      logging.info(f'Replacing with {local_insertion:<30}')
+      content = content[:m.start()] + local_insertion + content[m.end():]
+      m = p.search(content)
+    logging.info('Finished pattern: %s.', description)
+  return content
