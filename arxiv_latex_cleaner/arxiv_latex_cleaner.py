@@ -111,7 +111,8 @@ def _remove_command(text, command):
     if match.span()[1] < len(text):
       next_newline = text[match.span()[1]:].find('\n')
       if next_newline != -1:
-        text_until_newline = text[match.span()[1]:match.span()[1]+next_newline]
+        text_until_newline = text[match.span()[1]:match.span()[1] +
+                                  next_newline]
         if text_until_newline == '' or text_until_newline.isspace():
           new_substring = '%'
     all_substitutions.append((match.span()[0], match.span()[1], new_substring))

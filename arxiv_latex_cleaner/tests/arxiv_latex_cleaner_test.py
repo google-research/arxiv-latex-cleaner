@@ -29,10 +29,14 @@ def make_args(
     im_size=500,
     compress_pdf=False,
     pdf_im_resolution=500,
-    images_whitelist={},
-    commands_to_delete=[],
+    images_whitelist=None,
+    commands_to_delete=None,
     use_external_tikz='foo/bar/tikz',
 ):
+  if images_whitelist is None:
+    images_whitelist = {}
+  if commands_to_delete is None:
+    commands_to_delete = []
   args = {
       'input_folder': input_folder,
       'resize_images': resize_images,
@@ -50,7 +54,8 @@ def make_contents():
   contents = (r'& \figcompfigures{'
               '\n\timage1.jpg'
               '\n}{'
-              '\n\t\ww'
+              '\n\t'
+              r'\ww'
               '\n}{'
               '\n\t1.0'
               '\n\t}'
@@ -314,6 +319,10 @@ class UnitTests(parameterized.TestCase):
 
 class IntegrationTests(unittest.TestCase):
 
+  def setUp(self):
+    super(IntegrationTests, self).setUp()
+    self.out_path = 'tex_arXiv'
+
   def _compare_files(self, filename, filename_true):
     if path.splitext(filename)[1].lower() in ['.jpg', '.jpeg', '.png']:
       with Image.open(filename) as im, Image.open(filename_true) as im_true:
@@ -329,7 +338,6 @@ class IntegrationTests(unittest.TestCase):
 
   def test_complete(self):
     out_path_true = 'tex_arXiv_true'
-    self.out_path = 'tex_arXiv'
 
     # Make sure the folder does not exist, since we erase it in the test.
     if path.isdir(self.out_path):
