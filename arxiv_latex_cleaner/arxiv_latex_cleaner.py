@@ -288,7 +288,7 @@ def _resize_pdf_figure(filename,
 
 
 def _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits):
-  for fn in _keep_only_referenced(splits['non_tex_not_in_root'], contents, False):
+  for fn in _keep_only_referenced(splits['non_tex_not_in_root'], contents, strict=True):
     _copy_file(fn, parameters)
 
 
@@ -298,7 +298,7 @@ def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
   pdf_resolution = collections.defaultdict(
       lambda: parameters['pdf_im_resolution'])
   pdf_resolution.update(parameters['images_whitelist'])
-  for image_file in _keep_only_referenced(splits['figures'], contents):
+  for image_file in _keep_only_referenced(splits['figures'], contents, strict=False):
     _resize_and_copy_figure(
         filename=image_file,
         origin_folder=parameters['input_folder'],
@@ -309,19 +309,43 @@ def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
         pdf_resolution=pdf_resolution[image_file])
 
 
-def _search_reference(filename, contents, extension_optional):
-  if extension_optional:
-    required, optional = os.path.splitext(filename)
+def _search_reference(filename, contents, strict=False):
+  """
+  Returns a match object if filename is referenced in contents,
+  and None otherwise.
+  If not strict mode, path prefix and extension are optional.
+  """
+  if strict:
+    # regex pattern for strict=True for path/to/img.ext:
+    # \{[\s%]*path/to/img\.ext[\s%]*\}
+    filename_regex = filename.replace(".", r"\.")
   else:
-    required, optional = filename, ""
-  # regex pattern: \{[\s%]*<basename>(<ext>)?[\s%]*\}
-  patn = r"\{{[\s%]*{}({})?[\s%]*\}}".format(required, optional)
+    basename = os.path.basename(filename)
+    # make extension optional
+    root, extension = os.path.splitext(basename)
+    unescaped_basename_regex = "{}({})?".format(root, extension)
+    basename_regex = unescaped_basename_regex.replace(".", r"\.")
+
+    path = os.path.dirname(filename)
+    path_prefix_regex = ""
+    for fragment in os.path.split(path):
+      path_prefix_regex = "({}{}{})?".format(path_prefix_regex, fragment, os.sep)
+
+    # regex pattern for strict=True for path/to/img.ext:
+    # \{[\s%]*(<path_prefix>)?<basename>(<ext>)?[\s%]*\}
+    filename_regex = path_prefix_regex + basename_regex
+
+  # pad with braces and optional whitespace/comment characters
+  patn = r"\{{[\s%]*{}[\s%]*\}}".format(filename_regex)
   return re.search(patn, contents)
 
 
-def _keep_only_referenced(filenames, contents, extension_optional=True):
-  """Returns the filenames referenced from contents."""
-  return [fn for fn in filenames if _search_reference(fn, contents, extension_optional)]
+def _keep_only_referenced(filenames, contents, strict=False):
+  """
+  Returns the filenames referenced from contents.
+  If not strict mode, path prefix and extension are optional.
+  """
+  return [fn for fn in filenames if _search_reference(fn, contents, strict) is not None]
 
 
 def _keep_only_referenced_tex(contents, splits):
