@@ -83,6 +83,52 @@ def make_patterns():
   }
   return [output]
 
+def make_search_reference_tests():
+  return (
+    {
+        'testcase_name': 'with_extension_prefix1',
+        'filenames': ['include_image_yes.png', 'include_image.png'],
+        'contents': '\\include{include_image_yes.png}',
+        'extension_optional': False,
+        'true_outputs': ['include_image_yes.png']
+    },
+    {
+        'testcase_name': 'with_extension_prefix2',
+        'filenames': ['include_image_yes.png', 'include_image.png'],
+        'contents': '\\include{include_image.png}',
+        'extension_optional': False,
+        'true_outputs': ['include_image.png']
+    },
+    {
+        'testcase_name': 'with_extension_nested_more_specific',
+        'filenames': ['images/im_included.png', 'images/include/images/im_included.png'],
+        'contents': '\\include{images/include/images/im_included.png}',
+        'extension_optional': False,
+        'true_outputs': ['images/include/images/im_included.png']
+    },
+    {
+        'testcase_name': 'with_extension_nested_less_specific',
+        'filenames': ['images/im_included.png', 'images/include/images/im_included.png'],
+        'contents': '\\include{images/im_included.png}',
+        'extension_optional': False,
+        'true_outputs': ['images/im_included.png', 'images/include/images/im_included.png']
+    },
+    {
+        'testcase_name': 'with_extension_nested_substring',
+        'filenames': ['images/im_included.png', 'im_included.png'],
+        'contents': '\\include{images/im_included.png}',
+        'extension_optional': False,
+        'true_outputs': ['images/im_included.png']
+    },
+    {
+        'testcase_name': 'with_extension_nested_diffpath',
+        'filenames': ['images/im_included.png', 'figures/im_included.png'],
+        'contents': '\\include{images/im_included.png}',
+        'extension_optional': False,
+        'true_outputs': ['images/im_included.png']
+    }
+  )
+
 
 class UnitTests(parameterized.TestCase):
 
@@ -316,6 +362,54 @@ class UnitTests(parameterized.TestCase):
         arxiv_latex_cleaner._replace_tikzpictures(text_in, figures_in),
         true_output)
 
+  @parameterized.named_parameters(*make_search_reference_tests())
+  def test_search_reference_weak(self, filenames, contents, extension_optional, true_outputs):
+    cleaner_outputs = []
+    for filename in filenames:
+      reference = arxiv_latex_cleaner._search_reference(filename, contents, extension_optional)
+      if reference is not None:
+        cleaner_outputs.append(filename)
+
+    # weak check (passes as long as cleaner includes a superset of the true_output)
+    for true_output in true_outputs:
+      self.assertIn(true_output, cleaner_outputs)
+
+  @parameterized.named_parameters(*make_search_reference_tests())
+  def test_search_reference_strict(self, filenames, contents, extension_optional, true_outputs):
+    cleaner_outputs = []
+    for filename in filenames:
+      reference = arxiv_latex_cleaner._search_reference(filename, contents, extension_optional)
+      if reference is not None:
+        cleaner_outputs.append(filename)
+
+    # strict check (set of files must match exactly)
+    self.assertEqual(cleaner_outputs, true_outputs)
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'basic',
+          'filename': 'path/to/img.ext',
+          'content_strs': [
+              # match
+              '{img.ext}', '{to/img.ext}', '{path/to/img.ext}',
+              '{%\nimg.ext  }', '{to/img.ext % \n}',
+              '{  \npath/to/img.ext\n}',
+              '{img}', '{to/img}', '{path/to/img}',
+              # dont match
+              '{from/img.ext}', '{from/img}', '{imgoext}',
+              '{from/imgo}', '{path/img.ext}'
+          ],
+          'true_outputs': [True]*9 + [False]*5
+      }
+  )
+  def test_search_reference_filewise(self, filename, content_strs, true_outputs):
+    for content, true_output in zip(content_strs, true_outputs):
+      reference = arxiv_latex_cleaner._search_reference(filename, content, False)
+      matched = reference is not None
+      msg_not = " " if true_output else " not "
+      msg = '{} should have{}matched {}'.format(filename, msg_not, content)
+      self.assertEqual(matched, true_output, msg)
+
 
 class IntegrationTests(unittest.TestCase):
 
@@ -347,7 +441,8 @@ class IntegrationTests(unittest.TestCase):
     arxiv_latex_cleaner.run_arxiv_cleaner({
         'input_folder': 'tex',
         'images_whitelist': {
-            'images/im2_included.jpg': 200
+            'images/im2_included.jpg': 200,
+            'images/im3_included.png': 400,
         },
         'resize_images': True,
         'im_size': 100,

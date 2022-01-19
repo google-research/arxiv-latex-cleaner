@@ -11,6 +11,17 @@ This is a percent \%.
 % Whole line comment without newline
 \includegraphics{images/im1_included.png}
 %\includegraphics{images/im_not_included}
+\includegraphics{images/im3_included.png}
+\includegraphics{%
+  images/im4_included.png%
+  }
+\includegraphics[width=.5\linewidth]{%
+  images/im5_included.jpg}
+%\includegraphics{%
+%  images/im4_not_included.png
+%  }
+%\includegraphics[width=.5\linewidth]{%
+%  images/im5_not_included.jpg}
 
 This line should\mytodo{Do this later} not be separated
 \mytodo{This is a todo command with a nested \textit{command}.
