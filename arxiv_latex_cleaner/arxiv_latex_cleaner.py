@@ -327,9 +327,16 @@ def _search_reference(filename, contents, strict=False):
     unescaped_basename_regex = '{}({})?'.format(root, extension)
     basename_regex = unescaped_basename_regex.replace('.', r'\.')
 
-    path = os.path.dirname(filename)
+    # since os.path.split only splits into two parts
+    # need to iterate and collect all the fragments
+    fragments = []
+    cur_head = os.path.dirname(filename)
+    while cur_head:
+      cur_head, tail = os.path.split(cur_head)
+      fragments.insert(0, tail)  # insert at the beginning
+
     path_prefix_regex = ''
-    for fragment in os.path.split(path):
+    for fragment in fragments:
       path_prefix_regex = '({}{}{})?'.format(path_prefix_regex, fragment,
                                              os.sep)
 

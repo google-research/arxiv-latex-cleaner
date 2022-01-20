@@ -86,50 +86,117 @@ def make_patterns():
 
 def make_search_reference_tests():
   return ({
-      'testcase_name': 'with_extension_prefix1',
+      'testcase_name': 'prefix1',
       'filenames': ['include_image_yes.png', 'include_image.png'],
       'contents': '\\include{include_image_yes.png}',
-      'extension_optional': False,
+      'strict': False,
       'true_outputs': ['include_image_yes.png']
   }, {
-      'testcase_name': 'with_extension_prefix2',
+      'testcase_name': 'prefix2',
       'filenames': ['include_image_yes.png', 'include_image.png'],
       'contents': '\\include{include_image.png}',
-      'extension_optional': False,
+      'strict': False,
       'true_outputs': ['include_image.png']
   }, {
-      'testcase_name': 'with_extension_nested_more_specific',
+      'testcase_name': 'nested_more_specific',
       'filenames': [
           'images/im_included.png', 'images/include/images/im_included.png'
       ],
       'contents': '\\include{images/include/images/im_included.png}',
-      'extension_optional': False,
+      'strict': False,
       'true_outputs': ['images/include/images/im_included.png']
   }, {
       'testcase_name':
-          'with_extension_nested_less_specific',
+          'nested_less_specific',
       'filenames': [
           'images/im_included.png', 'images/include/images/im_included.png'
       ],
       'contents':
           '\\include{images/im_included.png}',
-      'extension_optional':
+      'strict':
           False,
       'true_outputs': [
           'images/im_included.png', 'images/include/images/im_included.png'
       ]
   }, {
-      'testcase_name': 'with_extension_nested_substring',
+      'testcase_name': 'nested_substring',
       'filenames': ['images/im_included.png', 'im_included.png'],
       'contents': '\\include{images/im_included.png}',
-      'extension_optional': False,
+      'strict': False,
       'true_outputs': ['images/im_included.png']
   }, {
-      'testcase_name': 'with_extension_nested_diffpath',
+      'testcase_name': 'nested_diffpath',
       'filenames': ['images/im_included.png', 'figures/im_included.png'],
       'contents': '\\include{images/im_included.png}',
-      'extension_optional': False,
+      'strict': False,
       'true_outputs': ['images/im_included.png']
+  }, {
+      'testcase_name': 'diffext',
+      'filenames': ['tables/demo.tex', 'tables/demo.tikz', 'demo.tex'],
+      'contents': '\\include{tables/demo.tex}',
+      'strict': False,
+      'true_outputs': ['tables/demo.tex']
+  }, {
+      'testcase_name': 'diffext2',
+      'filenames': ['tables/demo.tex', 'tables/demo.tikz', 'demo.tex'],
+      'contents': '\\include{tables/demo}',
+      'strict': False,
+      'true_outputs': ['tables/demo.tex', 'tables/demo.tikz']
+  }, {
+      'testcase_name': 'strict_prefix1',
+      'filenames': ['demo_yes.tex', 'demo.tex'],
+      'contents': '\\include{demo_yes.tex}',
+      'strict': True,
+      'true_outputs': ['demo_yes.tex']
+  }, {
+      'testcase_name': 'strict_prefix2',
+      'filenames': ['demo_yes.tex', 'demo.tex'],
+      'contents': '\\include{demo.tex}',
+      'strict': True,
+      'true_outputs': ['demo.tex']
+  }, {
+      'testcase_name': 'strict_nested_more_specific',
+      'filenames': [
+          'tables/table_included.csv', 'tables/include/tables/table_included.csv'
+      ],
+      'contents': '\\include{tables/include/tables/table_included.csv}',
+      'strict': True,
+      'true_outputs': ['tables/include/tables/table_included.csv']
+  }, {
+      'testcase_name':
+          'strict_nested_less_specific',
+      'filenames': [
+          'tables/table_included.csv', 'tables/include/tables/table_included.csv'
+      ],
+      'contents':
+          '\\include{tables/table_included.csv}',
+      'strict':
+          True,
+      'true_outputs': ['tables/table_included.csv']
+  }, {
+      'testcase_name': 'strict_nested_substring1',
+      'filenames': ['tables/table_included.csv', 'table_included.csv'],
+      'contents': '\\include{tables/table_included.csv}',
+      'strict': True,
+      'true_outputs': ['tables/table_included.csv']
+  }, {
+      'testcase_name': 'strict_nested_substring2',
+      'filenames': ['tables/table_included.csv', 'table_included.csv'],
+      'contents': '\\include{table_included.csv}',
+      'strict': True,
+      'true_outputs': ['table_included.csv']
+  }, {
+      'testcase_name': 'strict_nested_diffpath',
+      'filenames': ['tables/table_included.csv', 'data/table_included.csv'],
+      'contents': '\\include{tables/table_included.csv}',
+      'strict': True,
+      'true_outputs': ['tables/table_included.csv']
+  },  {
+      'testcase_name': 'strict_diffext',
+      'filenames': ['tables/demo.csv', 'tables/demo.txt', 'demo.csv'],
+      'contents': '\\include{tables/demo.csv}',
+      'strict': True,
+      'true_outputs': ['tables/demo.csv']
   })
 
 
@@ -366,12 +433,12 @@ class UnitTests(parameterized.TestCase):
         true_output)
 
   @parameterized.named_parameters(*make_search_reference_tests())
-  def test_search_reference_weak(self, filenames, contents, extension_optional,
+  def test_search_reference_weak(self, filenames, contents, strict,
                                  true_outputs):
     cleaner_outputs = []
     for filename in filenames:
       reference = arxiv_latex_cleaner._search_reference(filename, contents,
-                                                        extension_optional)
+                                                        strict)
       if reference is not None:
         cleaner_outputs.append(filename)
 
@@ -380,20 +447,59 @@ class UnitTests(parameterized.TestCase):
       self.assertIn(true_output, cleaner_outputs)
 
   @parameterized.named_parameters(*make_search_reference_tests())
-  def test_search_reference_strict(self, filenames, contents,
-                                   extension_optional, true_outputs):
+  def test_search_reference_strong(self, filenames, contents, strict,
+                                   true_outputs):
     cleaner_outputs = []
     for filename in filenames:
       reference = arxiv_latex_cleaner._search_reference(filename, contents,
-                                                        extension_optional)
+                                                        strict)
       if reference is not None:
         cleaner_outputs.append(filename)
 
-    # strict check (set of files must match exactly)
-    self.assertEqual(cleaner_outputs, true_outputs)
+    # strong check (set of files must match exactly)
+    weak_check_result = set(true_outputs).issubset(cleaner_outputs)
+    if weak_check_result:
+      msg = "not fatal, cleaner included more files than necessary"
+    else:
+      msg = "fatal, see test_search_reference_weak"
+    self.assertEqual(cleaner_outputs, true_outputs, msg)
 
   @parameterized.named_parameters({
-      'testcase_name': 'basic',
+    'testcase_name': 'three_parent',
+      'filename': 'long/path/to/img.ext',
+      'content_strs': [
+          # match
+          '{img.ext}',
+          '{to/img.ext}',
+          '{path/to/img.ext}',
+          '{long/path/to/img.ext}',
+          '{%\nimg.ext  }',
+          '{to/img.ext % \n}',
+          '{  \npath/to/img.ext\n}',
+          '{ \n \nlong/path/to/img.ext\n}',
+          '{img}',
+          '{to/img}',
+          '{path/to/img}',
+          '{long/path/to/img}',
+          # dont match
+          '{from/img.ext}',
+          '{from/img}',
+          '{imgoext}',
+          '{from/imgo}',
+          '{ \n long/\npath/to/img.ext\n}',
+          '{path/img.ext}',
+          '{long/img.ext}',
+          '{long/path/img.ext}',
+          '{long/to/img.ext}',
+          '{path/img}',
+          '{long/img}',
+          '{long/path/img}',
+          '{long/to/img}'
+      ],
+      'strict': False,
+      'true_outputs': [True] * 12 + [False] * 13
+  }, {
+      'testcase_name': 'two_parent',
       'filename': 'path/to/img.ext',
       'content_strs': [
           # match
@@ -407,22 +513,106 @@ class UnitTests(parameterized.TestCase):
           '{to/img}',
           '{path/to/img}',
           # dont match
+          '{long/path/to/img.ext}',
+          '{ \n \nlong/path/to/img.ext\n}',
+          '{long/path/to/img}',
           '{from/img.ext}',
           '{from/img}',
           '{imgoext}',
           '{from/imgo}',
-          '{path/img.ext}'
+          '{ \n long/\npath/to/img.ext\n}',
+          '{path/img.ext}',
+          '{long/img.ext}',
+          '{long/path/img.ext}',
+          '{long/to/img.ext}',
+          '{path/img}',
+          '{long/img}',
+          '{long/path/img}',
+          '{long/to/img}'
       ],
-      'true_outputs': [True] * 9 + [False] * 5
-  })
+      'strict': False,
+      'true_outputs': [True] * 9 + [False] * 16
+  }, {
+      'testcase_name': 'one_parent',
+      'filename': 'to/img.ext',
+      'content_strs': [
+          # match
+          '{img.ext}',
+          '{to/img.ext}',
+          '{%\nimg.ext  }',
+          '{to/img.ext % \n}',
+          '{img}',
+          '{to/img}',
+          # dont match
+          '{long/path/to/img}',
+          '{path/to/img}',
+          '{ \n \nlong/path/to/img.ext\n}',
+          '{  \npath/to/img.ext\n}',
+          '{long/path/to/img.ext}',
+          '{path/to/img.ext}',
+          '{from/img.ext}',
+          '{from/img}',
+          '{imgoext}',
+          '{from/imgo}',
+          '{ \n long/\npath/to/img.ext\n}',
+          '{path/img.ext}',
+          '{long/img.ext}',
+          '{long/path/img.ext}',
+          '{long/to/img.ext}',
+          '{path/img}',
+          '{long/img}',
+          '{long/path/img}',
+          '{long/to/img}'
+      ],
+      'strict': False,
+      'true_outputs': [True] * 6 + [False] * 19
+  }, {
+      'testcase_name': 'two_parent_strict',
+      'filename': 'path/to/img.ext',
+      'content_strs': [
+          # match
+          '{path/to/img.ext}',
+          '{  \npath/to/img.ext\n}',
+          # dont match
+          '{img.ext}',
+          '{to/img.ext}',
+          '{%\nimg.ext  }',
+          '{to/img.ext % \n}',
+          '{img}',
+          '{to/img}',
+          '{path/to/img}',
+          '{long/path/to/img.ext}',
+          '{ \n \nlong/path/to/img.ext\n}',
+          '{long/path/to/img}',
+          '{from/img.ext}',
+          '{from/img}',
+          '{imgoext}',
+          '{from/imgo}',
+          '{ \n long/\npath/to/img.ext\n}',
+          '{path/img.ext}',
+          '{long/img.ext}',
+          '{long/path/img.ext}',
+          '{long/to/img.ext}',
+          '{path/img}',
+          '{long/img}',
+          '{long/path/img}',
+          '{long/to/img}'
+      ],
+      'strict': True,
+      'true_outputs': [True] * 2 + [False] * 23
+  },
+  )
   def test_search_reference_filewise(self, filename, content_strs,
-                                     true_outputs):
+                                     strict, true_outputs):
+    if len(content_strs) != len(true_outputs):
+      raise ValueError("number of true_outputs doesn't match number of content strs")
     for content, true_output in zip(content_strs, true_outputs):
       reference = arxiv_latex_cleaner._search_reference(filename, content,
-                                                        False)
+                                                        strict)
       matched = reference is not None
       msg_not = ' ' if true_output else ' not '
-      msg = '{} should have{}matched {}'.format(filename, msg_not, content)
+      msg_fmt = 'file {} should' + msg_not + 'have matched latex reference {}'
+      msg = msg_fmt.format(filename, content)
       self.assertEqual(matched, true_output, msg)
 
 
