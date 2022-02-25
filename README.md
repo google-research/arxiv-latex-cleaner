@@ -7,19 +7,19 @@ arXiv.
 
 ## Example call:
 
-```console
+```bash
 arxiv_latex_cleaner /path/to/latex --im_size 500 --images_whitelist='{"images/im.png":2000}'
 ```
 
 Or simply from a config file
 
-```console
+```bash
 arxiv_latex_cleaner /path/to/latex --config cleaner_config.yaml
 ```
 
 ## Installation:
 
-```console
+```bash
 pip install arxiv-latex-cleaner
 ```
 
@@ -28,7 +28,7 @@ pip install arxiv-latex-cleaner
 
 Alternatively, you can download the source code:
 
-```console
+```bash
 git clone https://github.com/google-research/arxiv-latex-cleaner
 cd arxiv-latex-cleaner/
 python -m arxiv_latex_cleaner --help
@@ -36,7 +36,7 @@ python -m arxiv_latex_cleaner --help
 
 And install as a command-line program directly from the source code:
 
-```console
+```bash
 python setup.py install
 ```
 
@@ -168,7 +168,7 @@ optional arguments:
 
 ## Testing:
 
-```
+```bash
 python -m unittest arxiv_latex_cleaner.tests.arxiv_latex_cleaner_test
 ```
 
