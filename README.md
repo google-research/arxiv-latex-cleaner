@@ -23,8 +23,9 @@ arxiv_latex_cleaner /path/to/latex --config cleaner_config.yaml
 pip install arxiv-latex-cleaner
 ```
 
-| :exclamation:  arxiv_latex_cleaner is only compatible with Python >=3  :exclamation: |
-|--------------------------------------------------------------------------------------|
+| :exclamation: arxiv_latex_cleaner is only compatible with Python >=3 |
+: \:exclamation\:                                                      :
+| -------------------------------------------------------------------- |
 
 Alternatively, you can download the source code:
 
@@ -46,8 +47,8 @@ python setup.py install
 
 *   Removes all auxiliary files (`.aux`, `.log`, `.out`, etc.).
 *   Removes all comments from your code (yes, those are visible on arXiv and you
-    do not want them to be). These also include `\begin{comment}\end{comment}`
-    and `\iffalse\fi` environments.
+    do not want them to be). These also include `\begin{comment}\end{comment}`,
+    `\iffalse\fi`, and `\if0\fi` environments.
 *   Optionally removes user-defined commands entered with `commands_to_delete`
     (such as `\todo{}` that you redefine as the empty string at the end).
 *   Optionally allows you to define custom regex replacement rules through a
@@ -114,7 +115,7 @@ patterns.
 ## Usage:
 
 ```
-usage: arxiv_latex_cleaner@v0.1.22 [-h] [--resize_images] [--im_size IM_SIZE]
+usage: arxiv_latex_cleaner@v0.1.26 [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
                                    [--images_whitelist IMAGES_WHITELIST]

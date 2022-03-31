@@ -137,7 +137,8 @@ def _remove_iffalse_block(text):
   positions_to_delete = []
   start, end = 0, 0
   for m in p.finditer(text):
-    if (m.group().replace(" ", "") == r'\iffalse' or m.group().replace(" ", "") == r'\if0') and level == -1:
+    if (m.group().replace(' ', '') == r'\iffalse' or
+        m.group().replace(' ', '') == r'\if0') and level == -1:
       level += 1
       start = m.start()
     elif m.group().startswith(r'\if') and level >= 0:
@@ -343,7 +344,7 @@ def _search_reference(filename, contents, strict=False):
     # regex pattern for strict=True for path/to/img.ext:
     # \{[\s%]*(<path_prefix>)?<basename>(<ext>)?[\s%]*\}
     filename_regex = path_prefix_regex + basename_regex
-    
+
   # some files 'path/to/file' are referenced in tex as './path/to/file'
   # thus add prefix for relative paths starting with './' or '.\' to regex search
   filename_regex = r'(.' + os.sep + r')?' + filename_regex
