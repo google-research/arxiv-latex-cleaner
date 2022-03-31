@@ -343,6 +343,10 @@ def _search_reference(filename, contents, strict=False):
     # regex pattern for strict=True for path/to/img.ext:
     # \{[\s%]*(<path_prefix>)?<basename>(<ext>)?[\s%]*\}
     filename_regex = path_prefix_regex + basename_regex
+    
+  # some files 'path/to/file' are referenced in tex as './path/to/file'
+  # thus add prefix for relative paths starting with './' or '.\' to regex search
+  filename_regex = r'(.' + os.sep + r')?' + filename_regex
 
   # pad with braces and optional whitespace/comment characters
   patn = r'\{{[\s%]*{}[\s%]*\}}'.format(filename_regex)
