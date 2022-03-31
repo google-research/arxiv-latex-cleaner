@@ -23,9 +23,8 @@ arxiv_latex_cleaner /path/to/latex --config cleaner_config.yaml
 pip install arxiv-latex-cleaner
 ```
 
-| :exclamation: arxiv_latex_cleaner is only compatible with Python >=3 |
-: \:exclamation\:                                                      :
-| -------------------------------------------------------------------- |
+| :exclamation: arxiv_latex_cleaner is only compatible with Python >=3 :exclamation: |
+| ---------------------------------------------------------------------------------- |
 
 Alternatively, you can download the source code:
 
