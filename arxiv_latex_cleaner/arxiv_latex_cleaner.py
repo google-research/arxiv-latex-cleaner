@@ -97,28 +97,34 @@ def _copy_file(filename, params):
       os.path.join(params['output_folder'], filename))
 
 
-def _remove_command(text, command):
+def _remove_command(text, command, keep_text=False):
   """Removes '\\command{*}' from the string 'text'.
 
   Regex `base_pattern` used to match balanced parentheses taken from:
   https://stackoverflow.com/questions/546433/regular-expression-to-match-balanced-parentheses/35271017#35271017
   """
   base_pattern = r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}'
-  all_substitutions = []
-  for match in re.finditer(base_pattern, text):
-    # In case there are only spaces or nothing up to the following newline, adds a percent, not to alter the newlines.
-    new_substring = ''
-    if match.span()[1] < len(text):
-      next_newline = text[match.span()[1]:].find('\n')
-      if next_newline != -1:
-        text_until_newline = text[match.span()[1]:match.span()[1] +
-                                  next_newline]
-        if text_until_newline == '' or text_until_newline.isspace():
-          new_substring = '%'
-    all_substitutions.append((match.span()[0], match.span()[1], new_substring))
+  # Loop in case of nested commands that need to retain text, e.g., \red{hello \red{world}}
+  while True:
+    all_substitutions = []
+    has_match = False
+    for match in re.finditer(base_pattern, text):
+        # In case there are only spaces or nothing up to the following newline, adds a percent, not to alter the newlines.
+        has_match = True
+        new_substring = '' if not keep_text else text[match.span()[0] + len(command) + 2:match.span()[1] - 1]
+        if match.span()[1] < len(text):
+            next_newline = text[match.span()[1]:].find('\n')
+            if next_newline != -1:
+                text_until_newline = text[match.span()[1]:match.span()[1]+next_newline]
+                if (text_until_newline == '' or text_until_newline.isspace()) and not keep_text:
+                    new_substring = '%'
+        all_substitutions.append((match.span()[0], match.span()[1], new_substring))
 
-  for (start, end, new_substring) in reversed(all_substitutions):
-    text = text[:start] + new_substring + text[end:]
+    for (start, end, new_substring) in reversed(all_substitutions):
+        text = text[:start] + new_substring + text[end:]
+
+    if not keep_text or not has_match:
+        break
 
   return text
 
@@ -211,8 +217,10 @@ def _remove_comments_and_commands_to_delete(content, parameters):
   content = [_remove_comments_inline(line) for line in content]
   content = _remove_environment(''.join(content), 'comment')
   content = _remove_iffalse_block(content)
+  for command in parameters.get("commands_only_to_delete", []):
+    content = _remove_command(content, command, True)
   for command in parameters['commands_to_delete']:
-    content = _remove_command(content, command)
+    content = _remove_command(content, command, False)
   return content
 
 
@@ -351,7 +359,8 @@ def _search_reference(filename, contents, strict=False):
 
   # pad with braces and optional whitespace/comment characters
   patn = r'\{{[\s%]*{}[\s%]*\}}'.format(filename_regex)
-  return re.search(patn, contents)
+  # Picture references in LaTeX are allowed to be in different cases
+  return re.search(patn, contents, re.IGNORECASE)
 
 
 def _keep_only_referenced(filenames, contents, strict=False):

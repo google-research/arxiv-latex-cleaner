@@ -95,6 +95,20 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--commands_only_to_delete",
+    nargs="+",
+    default=[],
+    required=False,
+    help=(
+        "LaTeX commands that will be deleted but the text wrapped in the "
+        "commands will be retained. Useful for commands that change text "
+        "formats and colors, which you may want to remove but keep the "
+        "text within. Usages are exactly the same as commands_to_delete. "
+        "Note that if the commands listed here duplicate that after "
+        "commands_to_delete, the default action will be retaining the wrapped text."),
+)
+
+PARSER.add_argument(
     "--use_external_tikz",
     type=str,
     help=("Folder (relative to input folder) containing externalized tikz "

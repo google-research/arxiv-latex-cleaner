@@ -283,23 +283,52 @@ class UnitTests(parameterized.TestCase):
       {
           'testcase_name': 'no_command',
           'text_in': 'Foo\nFoo2\n',
+          'keep_text': False,
           'true_output': 'Foo\nFoo2\n'
       }, {
           'testcase_name': 'command_not_removed',
           'text_in': '\\textit{Foo\nFoo2}\n',
+          'keep_text': False,
           'true_output': '\\textit{Foo\nFoo2}\n'
       }, {
           'testcase_name': 'command_no_end_line_removed',
           'text_in': 'A\\todo{B\nC}D\nE\n\\end{document}',
+          'keep_text': False,
           'true_output': 'AD\nE\n\\end{document}'
       }, {
           'testcase_name': 'command_with_end_line_removed',
           'text_in': 'A\n\\todo{B\nC}\nD\n\\end{document}',
+          'keep_text': False,
           'true_output': 'A\n%\nD\n\\end{document}'
+      }, {
+          'testcase_name': 'no_command_keep_text',
+          'text_in': 'Foo\nFoo2\n',
+          'keep_text': True,
+          'true_output': 'Foo\nFoo2\n'
+      }, {
+          'testcase_name': 'command_not_removed_keep_text',
+          'text_in': '\\textit{Foo\nFoo2}\n',
+          'keep_text': True,
+          'true_output': '\\textit{Foo\nFoo2}\n'
+      }, {
+          'testcase_name': 'command_no_end_line_removed_keep_text',
+          'text_in': 'A\\todo{B\nC}D\nE\n\\end{document}',
+          'keep_text': True,
+          'true_output': 'AB\nCD\nE\n\\end{document}'
+      }, {
+          'testcase_name': 'command_with_end_line_removed_keep_text',
+          'text_in': 'A\n\\todo{B\nC}\nD\n\\end{document}',
+          'keep_text': True,
+          'true_output': 'A\nB\nC\nD\n\\end{document}'
+      }, {
+          'testcase_name': 'nested_command_keep_text',
+          'text_in': 'A\n\\todo{B\n\\todo{C}}\nD\n\\end{document}',
+          'keep_text': True,
+          'true_output': 'A\nB\nC\nD\n\\end{document}'
       })
-  def test_remove_command(self, text_in, true_output):
+  def test_remove_command(self, text_in, keep_text, true_output):
     self.assertEqual(
-        arxiv_latex_cleaner._remove_command(text_in, 'todo'), true_output)
+        arxiv_latex_cleaner._remove_command(text_in, 'todo', keep_text), true_output)
 
   @parameterized.named_parameters(
       {
@@ -664,6 +693,7 @@ class IntegrationTests(unittest.TestCase):
         'compress_pdf': False,
         'pdf_im_resolution': 500,
         'commands_to_delete': ['mytodo'],
+        'commands_only_to_delete': ['red'],
         'use_external_tikz': 'ext_tikz',
         'keep_bib': False
     })
