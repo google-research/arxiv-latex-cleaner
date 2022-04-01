@@ -196,6 +196,12 @@ def make_search_reference_tests():
       'contents': '\\include{tables/demo.csv}',
       'strict': True,
       'true_outputs': ['tables/demo.csv']
+  }, {
+      'testcase_name': 'path_starting_with_dot',
+      'filenames': ['./images/im_included.png', './figures/im_included.png'],
+      'contents': '\\include{./images/im_included.png}',
+      'strict': False,
+      'true_outputs': ['./images/im_included.png']
   })
 
 
