@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import filecmp
 from os import path
 import shutil
 import unittest
@@ -641,9 +640,11 @@ class IntegrationTests(unittest.TestCase):
             im.size, im_true.size,
             'Images {:s} was not resized properly.'.format(filename))
     else:
-      self.assertTrue(
-          filecmp.cmp(filename, filename_true),
-          '{:s} and {:s} are not equal.'.format(filename, filename_true))
+        # Check if text files are equal without taking in account end of line characters
+        processed_contend   = open(filename, 'rb' ).read().splitlines()
+        groundtruth_content = open(filename_true, 'rb' ).read().splitlines()
+
+        self.assertEqual( processed_contend, groundtruth_content, '{:s} and {:s} are not equal.'.format(filename, filename_true))
 
   def test_complete(self):
     out_path_true = 'tex_arXiv_true'
