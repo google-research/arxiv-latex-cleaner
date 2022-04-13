@@ -114,7 +114,7 @@ patterns.
 ## Usage:
 
 ```
-usage: arxiv_latex_cleaner@v0.1.26 [-h] [--resize_images] [--im_size IM_SIZE]
+usage: arxiv_latex_cleaner@v0.1.27 [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
                                    [--images_whitelist IMAGES_WHITELIST]
@@ -156,6 +156,15 @@ optional arguments:
                         come immediately after `commands_to_delete`, as the
                         parser does not have any way to know if it's another
                         command to delete.
+  --commands_only_to_delete COMMANDS_ONLY_TO_DELETE [COMMANDS_ONLY_TO_DELETE ...]
+                        LaTeX commands that will be deleted but the text 
+                        wrapped in the commands will be retained. Useful for
+                        commands that change text formats and colors, which
+                        you may want to remove but keep the text within. Usages
+                        are exactly the same as commands_to_delete. Note that if
+                        the commands listed here duplicate that after
+                        commands_to_delete, the default action will be retaining
+                        the wrapped text.
   --use_external_tikz USE_EXTERNAL_TIKZ
                         Folder (relative to input folder) containing
                         externalized tikz figures in PDF format.

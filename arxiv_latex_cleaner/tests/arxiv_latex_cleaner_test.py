@@ -50,17 +50,16 @@ def make_args(
 
 
 def make_contents():
-  contents = (r'& \figcompfigures{'
-              '\n\timage1.jpg'
-              '\n}{'
-              '\n\t'
-              r'\ww'
-              '\n}{'
-              '\n\t1.0'
-              '\n\t}'
-              '\n& '
-              r'\figcompfigures{image2.jpg}{\ww}{1.0}')
-  return contents
+  return (r'& \figcompfigures{'
+          '\n\timage1.jpg'
+          '\n}{'
+          '\n\t'
+          r'\ww'
+          '\n}{'
+          '\n\t1.0'
+          '\n\t}'
+          '\n& '
+          r'\figcompfigures{image2.jpg}{\ww}{1.0}')
 
 
 def make_patterns():
@@ -327,7 +326,8 @@ class UnitTests(parameterized.TestCase):
       })
   def test_remove_command(self, text_in, keep_text, true_output):
     self.assertEqual(
-        arxiv_latex_cleaner._remove_command(text_in, 'todo', keep_text), true_output)
+        arxiv_latex_cleaner._remove_command(text_in, 'todo', keep_text),
+        true_output)
 
   @parameterized.named_parameters(
       {
@@ -669,11 +669,16 @@ class IntegrationTests(unittest.TestCase):
             im.size, im_true.size,
             'Images {:s} was not resized properly.'.format(filename))
     else:
-        # Check if text files are equal without taking in account end of line characters
-        processed_contend   = open(filename, 'rb' ).read().splitlines()
-        groundtruth_content = open(filename_true, 'rb' ).read().splitlines()
+      # Checks if text files are equal without taking in account end of line
+      # characters.
+      with open(filename, 'rb') as f:
+        processed_content = f.read().splitlines()
+      with open(filename_true, 'rb') as f:
+        groundtruth_content = f.read().splitlines()
 
-        self.assertEqual( processed_contend, groundtruth_content, '{:s} and {:s} are not equal.'.format(filename, filename_true))
+      self.assertEqual(
+          processed_content, groundtruth_content,
+          '{:s} and {:s} are not equal.'.format(filename, filename_true))
 
   def test_complete(self):
     out_path_true = 'tex_arXiv_true'

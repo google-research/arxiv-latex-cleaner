@@ -104,27 +104,34 @@ def _remove_command(text, command, keep_text=False):
   https://stackoverflow.com/questions/546433/regular-expression-to-match-balanced-parentheses/35271017#35271017
   """
   base_pattern = r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}'
-  # Loop in case of nested commands that need to retain text, e.g., \red{hello \red{world}}
+  # Loops in case of nested commands that need to retain text, e.g.,
+  # \red{hello \red{world}}.
   while True:
     all_substitutions = []
     has_match = False
     for match in re.finditer(base_pattern, text):
-        # In case there are only spaces or nothing up to the following newline, adds a percent, not to alter the newlines.
-        has_match = True
-        new_substring = '' if not keep_text else text[match.span()[0] + len(command) + 2:match.span()[1] - 1]
-        if match.span()[1] < len(text):
-            next_newline = text[match.span()[1]:].find('\n')
-            if next_newline != -1:
-                text_until_newline = text[match.span()[1]:match.span()[1]+next_newline]
-                if (text_until_newline == '' or text_until_newline.isspace()) and not keep_text:
-                    new_substring = '%'
-        all_substitutions.append((match.span()[0], match.span()[1], new_substring))
+      # In case there are only spaces or nothing up to the following newline,
+      # adds a percent, not to alter the newlines.
+      has_match = True
+      new_substring = '' if not keep_text else text[match.span()[0] +
+                                                    len(command) +
+                                                    2:match.span()[1] - 1]
+      if match.span()[1] < len(text):
+        next_newline = text[match.span()[1]:].find('\n')
+        if next_newline != -1:
+          text_until_newline = text[match.span()[1]:match.span()[1] +
+                                    next_newline]
+          if (not text_until_newline or
+              text_until_newline.isspace()) and not keep_text:
+            new_substring = '%'
+      all_substitutions.append(
+          (match.span()[0], match.span()[1], new_substring))
 
     for (start, end, new_substring) in reversed(all_substitutions):
-        text = text[:start] + new_substring + text[end:]
+      text = text[:start] + new_substring + text[end:]
 
     if not keep_text or not has_match:
-        break
+      break
 
   return text
 
@@ -217,7 +224,7 @@ def _remove_comments_and_commands_to_delete(content, parameters):
   content = [_remove_comments_inline(line) for line in content]
   content = _remove_environment(''.join(content), 'comment')
   content = _remove_iffalse_block(content)
-  for command in parameters.get("commands_only_to_delete", []):
+  for command in parameters.get('commands_only_to_delete', []):
     content = _remove_command(content, command, True)
   for command in parameters['commands_to_delete']:
     content = _remove_command(content, command, False)
@@ -349,17 +356,17 @@ def _search_reference(filename, contents, strict=False):
       path_prefix_regex = '({}{}{})?'.format(path_prefix_regex, fragment,
                                              os.sep)
 
-    # regex pattern for strict=True for path/to/img.ext:
+    # Regex pattern for strict=True for path/to/img.ext:
     # \{[\s%]*(<path_prefix>)?<basename>(<ext>)?[\s%]*\}
     filename_regex = path_prefix_regex + basename_regex
 
-  # some files 'path/to/file' are referenced in tex as './path/to/file'
-  # thus add prefix for relative paths starting with './' or '.\' to regex search
+  # Some files 'path/to/file' are referenced in tex as './path/to/file' thus
+  # adds prefix for relative paths starting with './' or '.\' to regex search.
   filename_regex = r'(.' + os.sep + r')?' + filename_regex
 
-  # pad with braces and optional whitespace/comment characters
+  # Pads with braces and optional whitespace/comment characters.
   patn = r'\{{[\s%]*{}[\s%]*\}}'.format(filename_regex)
-  # Picture references in LaTeX are allowed to be in different cases
+  # Picture references in LaTeX are allowed to be in different cases.
   return re.search(patn, contents, re.IGNORECASE)
 
 
