@@ -145,7 +145,7 @@ def _remove_environment(text, environment):
 
 def _remove_iffalse_block(text):
   """Removes possibly nested r'\iffalse*\fi' blocks from 'text'."""
-  p = re.compile(r'\\if\s*(\w+)|\\fi')
+  p = re.compile(r'\\if\s*(\w+)|\\fi(?!\w)')
   level = -1
   positions_to_delete = []
   start, end = 0, 0
