@@ -377,6 +377,10 @@ class UnitTests(parameterized.TestCase):
           'testcase_name': 'if_removed_backslash',
           'text_in': '\\iffalse\nFoo\n\\fi\\end{document}',
           'true_output': '\\end{document}'
+      }, {
+          'testcase_name': 'commands_not_removed',
+          'text_in': '\\newcommand\\figref[1]{Figure~\\ref{fig:\#1}}',
+          'true_output': '\\newcommand\\figref[1]{Figure~\\ref{fig:\#1}}'
       })
   def test_remove_iffalse_block(self, text_in, true_output):
     self.assertEqual(
