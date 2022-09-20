@@ -17,7 +17,7 @@ import collections
 
 import copy
 import os
-import re
+import regex
 import shutil
 import subprocess
 import logging
@@ -64,7 +64,7 @@ def _keep_pattern(haystack, patterns_to_keep):
   """Keeps the strings that match 'patterns_to_keep'."""
   out = []
   for item in haystack:
-    if any((re.findall(rem, item) for rem in patterns_to_keep)):
+    if any((regex.findall(rem, item) for rem in patterns_to_keep)):
       out.append(item)
   return out
 
@@ -103,13 +103,13 @@ def _remove_command(text, command, keep_text=False):
   Regex `base_pattern` used to match balanced parentheses taken from:
   https://stackoverflow.com/questions/546433/regular-expression-to-match-balanced-parentheses/35271017#35271017
   """
-  base_pattern = r'\\' + command + r'{(?:[^}{]+|{(?:[^}{]+|{[^}{]*})*})*}'
+  base_pattern = r'\\' + command + r'\{((?:[^{}]+|\{(?1)\})*)\}'
   # Loops in case of nested commands that need to retain text, e.g.,
   # \red{hello \red{world}}.
   while True:
     all_substitutions = []
     has_match = False
-    for match in re.finditer(base_pattern, text):
+    for match in regex.finditer(base_pattern, text):
       # In case there are only spaces or nothing up to the following newline,
       # adds a percent, not to alter the newlines.
       has_match = True
@@ -138,14 +138,14 @@ def _remove_command(text, command, keep_text=False):
 
 def _remove_environment(text, environment):
   """Removes '\\begin{environment}*\\end{environment}' from 'text'."""
-  return re.sub(
+  return regex.sub(
       r'\\begin{' + environment + r'}[\s\S]*?\\end{' + environment + r'}', '',
       text)
 
 
 def _remove_iffalse_block(text):
   """Removes possibly nested r'\iffalse*\fi' blocks from 'text'."""
-  p = re.compile(r'\\if\s*(\w+)|\\fi(?!\w)')
+  p = regex.compile(r'\\if\s*(\w+)|\\fi(?!\w)')
   level = -1
   positions_to_delete = []
   start, end = 0, 0
@@ -180,7 +180,7 @@ def _remove_comments_inline(text):
     return text
   if text.lstrip(' ').lstrip('\t').startswith('%'):
     return ''
-  match = re.search(r'(?<!\\)%', text)
+  match = regex.search(r'(?<!\\)%', text)
   if match:
     return text[:match.end()] + '\n'
   else:
@@ -238,7 +238,7 @@ def _replace_tikzpictures(content, figures):
   """
 
   def get_figure(matchobj):
-    found_tikz_filename = re.search(r'\\tikzsetnextfilename{(.*?)}',
+    found_tikz_filename = regex.search(r'\\tikzsetnextfilename{(.*?)}',
                                     matchobj.group(0)).group(1)
     # search in tex split if figure is available
     matching_tikz_filenames = _keep_pattern(
@@ -248,7 +248,7 @@ def _replace_tikzpictures(content, figures):
     else:
       return matchobj.group(0)
 
-  content = re.sub(r'\\tikzsetnextfilename{[\s\S]*?\\end{tikzpicture}',
+  content = regex.sub(r'\\tikzsetnextfilename{[\s\S]*?\\end{tikzpicture}',
                    get_figure, content)
 
   return content
@@ -367,7 +367,7 @@ def _search_reference(filename, contents, strict=False):
   # Pads with braces and optional whitespace/comment characters.
   patn = r'\{{[\s%]*{}[\s%]*\}}'.format(filename_regex)
   # Picture references in LaTeX are allowed to be in different cases.
-  return re.search(patn, contents, re.IGNORECASE)
+  return regex.search(patn, contents, regex.IGNORECASE)
 
 
 def _keep_only_referenced(filenames, contents, strict=False):
@@ -392,7 +392,7 @@ def _keep_only_referenced_tex(contents, splits):
     referenced = set(splits['tex_in_root'])
     for fn in old_referenced:
       for fn2 in old_referenced:
-        if re.search(r'(' + os.path.splitext(fn)[0] + r'[.}])',
+        if regex.search(r'(' + os.path.splitext(fn)[0] + r'[.}])',
                      '\n'.join(contents[fn2])):
           referenced.add(fn)
 
@@ -539,8 +539,8 @@ def strip_whitespace(text):
 
   https://stackoverflow.com/questions/8270092/remove-all-whitespace-in-a-string
   """
-  pattern = re.compile(r'\s+')
-  text = re.sub(pattern, '', text)
+  pattern = regex.compile(r'\s+')
+  text = regex.sub(pattern, '', text)
   return text
 
 
@@ -586,7 +586,7 @@ def _find_and_replace_patterns(content, patterns_and_insertions):
     insertion = pattern_and_insertion['insertion']
     description = pattern_and_insertion['description']
     logging.info('Processing pattern: %s.', description)
-    p = re.compile(pattern)
+    p = regex.compile(pattern)
     m = p.search(content)
     while m is not None:
       local_insertion = insertion.format(**m.groupdict())

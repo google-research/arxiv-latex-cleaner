@@ -1,3 +1,4 @@
 absl_py>=0.12
 pillow>=6.2.0
 pyyaml
+regex
