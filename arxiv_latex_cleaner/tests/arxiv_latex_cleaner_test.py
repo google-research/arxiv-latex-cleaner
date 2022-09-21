@@ -323,7 +323,13 @@ class UnitTests(parameterized.TestCase):
           'text_in': 'A\n\\todo{B\n\\todo{C}}\nD\n\\end{document}',
           'keep_text': True,
           'true_output': 'A\nB\nC\nD\n\\end{document}'
-      })
+      }, {
+          'testcase_name': 'deeply_nested_command_keep_text',
+          'text_in': 'A\n\\todo{B\n\\emph{C\\footnote{\\textbf{D}}}}\nE\n\\end{document}',
+          'keep_text': True,
+          'true_output': 'A\nB\n\\emph{C\\footnote{\\textbf{D}}}\nE\n\\end{document}'
+      }
+      )
   def test_remove_command(self, text_in, keep_text, true_output):
     self.assertEqual(
         arxiv_latex_cleaner._remove_command(text_in, 'todo', keep_text),
