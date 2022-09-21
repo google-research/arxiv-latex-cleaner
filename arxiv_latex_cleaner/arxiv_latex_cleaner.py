@@ -239,7 +239,7 @@ def _replace_tikzpictures(content, figures):
 
   def get_figure(matchobj):
     found_tikz_filename = regex.search(r'\\tikzsetnextfilename{(.*?)}',
-                                    matchobj.group(0)).group(1)
+                                       matchobj.group(0)).group(1)
     # search in tex split if figure is available
     matching_tikz_filenames = _keep_pattern(
         figures, ['/' + found_tikz_filename + '.pdf'])
@@ -249,7 +249,7 @@ def _replace_tikzpictures(content, figures):
       return matchobj.group(0)
 
   content = regex.sub(r'\\tikzsetnextfilename{[\s\S]*?\\end{tikzpicture}',
-                   get_figure, content)
+                      get_figure, content)
 
   return content
 
@@ -393,7 +393,7 @@ def _keep_only_referenced_tex(contents, splits):
     for fn in old_referenced:
       for fn2 in old_referenced:
         if regex.search(r'(' + os.path.splitext(fn)[0] + r'[.}])',
-                     '\n'.join(contents[fn2])):
+                        '\n'.join(contents[fn2])):
           referenced.add(fn)
 
     if referenced == old_referenced:
