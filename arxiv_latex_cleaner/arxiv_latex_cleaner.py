@@ -73,7 +73,7 @@ def _remove_pattern(haystack, patterns_to_remove):
   """Removes the strings that match 'patterns_to_remove'."""
   return [
       item for item in haystack
-      if item not in _keep_pattern(haystack, patterns_to_remove)
+      if item not in _keep_pattern([item], patterns_to_remove)
   ]
 
 
