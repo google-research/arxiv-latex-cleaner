@@ -471,7 +471,7 @@ def run_arxiv_cleaner(parameters):
       r'\.aux$', r'\.sh$', r'\.blg$', r'\.brf$', r'\.log$', r'\.out$', r'\.ps$',
       r'\.dvi$', r'\.synctex.gz$', '~$', r'\.backup$', r'\.gitignore$',
       r'\.DS_Store$', r'\.svg$', r'^\.idea', r'\.dpth$', r'\.md5$', r'\.dep$',
-      r'\.auxlock$'
+      r'\.auxlock$', r'\.fls$', r'\.fdb_latexmk$'
   ]
 
   if not parameters['keep_bib']:
