@@ -478,6 +478,46 @@ class UnitTests(parameterized.TestCase):
         arxiv_latex_cleaner._replace_tikzpictures(text_in, figures_in),
         true_output)
 
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'no_includesvg',
+          'text_in': 'Foo\n',
+          'figures_in': ['ext_svg/test1-tex.pdf_tex',
+                         'ext_svg/test2-tex.pdf_tex'],
+          'true_output': 'Foo\n'
+      }, {
+          'testcase_name':
+              'includesvg_no_match',
+          'text_in':
+              'Foo\\includesvg{test_no_match}\nFoo',
+          'figures_in': ['ext_svg/test1-tex.pdf_tex',
+                         'ext_svg/test2-tex.pdf_tex'],
+          'true_output':
+              'Foo\\includesvg{test_no_match}\nFoo',
+      }, {
+          'testcase_name':
+              'includesvg_match',
+          'text_in':
+              'Foo\\includesvg{test2}\nFoo',
+          'figures_in': ['ext_svg/test1-tex.pdf_tex',
+                         'ext_svg/test2-tex.pdf_tex'],
+          'true_output':
+              'Foo\\includeinkscape{ext_svg/test2-tex.pdf_tex}\nFoo'
+      }, {
+          'testcase_name':
+              'includesvg_match_with_options',
+          'text_in':
+              'Foo\\includesvg[width=\\linewidth]{test2}\nFoo',
+          'figures_in': ['ext_svg/test1-tex.pdf_tex',
+                         'ext_svg/test2-tex.pdf_tex'],
+          'true_output':
+              'Foo\\includeinkscape[width=\\linewidth]{ext_svg/test2-tex.pdf_tex}\nFoo'
+      })
+  def test_replace_includesvg(self, text_in, figures_in, true_output):
+    self.assertEqual(
+        arxiv_latex_cleaner._replace_includesvg(text_in, figures_in),
+        true_output)
+
   @parameterized.named_parameters(*make_search_reference_tests())
   def test_search_reference_weak(self, filenames, contents, strict,
                                  true_outputs):
