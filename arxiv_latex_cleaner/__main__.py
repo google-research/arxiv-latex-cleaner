@@ -109,6 +109,21 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--environments_to_delete",
+    nargs="+",
+    default=[],
+    required=False,
+    help=(
+        "LaTeX environments that will be deleted. Useful for e.g. user-"
+        "defined comment environments. For example, to delete all occurences "
+        "of \\begin{note} ... \\end{note}, run the tool with "
+        "`--environments_to_delete note`. Please note that the positional "
+        "argument `input_folder` cannot come immediately after "
+        "`environments_to_delete`, as the parser does not have any way to "
+        "know if it's another environment to delete."),
+)
+
+PARSER.add_argument(
     "--use_external_tikz",
     type=str,
     help=("Folder (relative to input folder) containing externalized tikz "
