@@ -753,6 +753,7 @@ class IntegrationTests(unittest.TestCase):
         'pdf_im_resolution': 500,
         'commands_to_delete': ['mytodo'],
         'commands_only_to_delete': ['red'],
+        'environments_to_delete': ['mynote'],
         'use_external_tikz': 'ext_tikz',
         'keep_bib': False
     })
