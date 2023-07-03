@@ -138,8 +138,10 @@ def _remove_command(text, command, keep_text=False):
 
 def _remove_environment(text, environment):
   """Removes '\\begin{environment}*\\end{environment}' from 'text'."""
+  # Need to escape '{', to not trigger fuzzy matching if `environment` starts
+  # with one of 'i', 'd', 's', or 'e'
   return regex.sub(
-      r'\\begin{' + environment + r'}[\s\S]*?\\end{' + environment + r'}', '',
+      r'\\begin\{' + environment + r'}[\s\S]*?\\end\{' + environment + r'}', '',
       text)
 
 
@@ -224,6 +226,8 @@ def _remove_comments_and_commands_to_delete(content, parameters):
   content = [_remove_comments_inline(line) for line in content]
   content = _remove_environment(''.join(content), 'comment')
   content = _remove_iffalse_block(content)
+  for environment in parameters.get('environments_to_delete', []):
+    content = _remove_environment(content, environment)
   for command in parameters.get('commands_only_to_delete', []):
     content = _remove_command(content, command, True)
   for command in parameters['commands_to_delete']:
