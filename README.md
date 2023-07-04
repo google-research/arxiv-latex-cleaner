@@ -26,6 +26,12 @@ pip install arxiv-latex-cleaner
 | :exclamation: arxiv_latex_cleaner is only compatible with Python >=3 :exclamation: |
 | ---------------------------------------------------------------------------------- |
 
+If using MacOS, you can install using [Homebrew](https://brew.sh/):
+
+```bash
+brew install arxiv_latex_cleaner
+```
+
 Alternatively, you can download the source code:
 
 ```bash

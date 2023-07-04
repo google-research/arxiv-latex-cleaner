@@ -13,4 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = "v0.1.31"
+__version__ = "v1.0.0"
