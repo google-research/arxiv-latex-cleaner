@@ -8,7 +8,7 @@ arXiv.
 ## Example call:
 
 ```bash
-arxiv_latex_cleaner /path/to/latex --resize_images --im_size 500 --images_whitelist='{"images/im.png":2000}'
+arxiv_latex_cleaner /path/to/latex --resize_images --im_size 500 --images_allowlist='{"images/im.png":2000}'
 ```
 
 Or simply from a config file
@@ -62,11 +62,11 @@ There is a 50MB limit on arXiv submissions, so to make it fit:
 *   Removes all unused images that take up space (those that are not actually
     included in any used `.tex` file).
 *   Optionally resizes all images to `im_size` pixels, to reduce the size of the
-    submission. You can whitelist some images to skip the global size using
-    `images_whitelist`.
+    submission. You can allowlist some images to skip the global size using
+    `images_allowlist`.
 *   Optionally compresses `.pdf` files using ghostscript (Linux and Mac only).
-    You can whitelist some PDFs to skip the global size using
-    `images_whitelist`.
+    You can allowlist some PDFs to skip the global size using
+    `images_allowlist`.
 
 #### TikZ picture source code concealment
 
@@ -117,7 +117,7 @@ patterns.
 usage: arxiv_latex_cleaner@v0.1.30 [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
-                                   [--images_whitelist IMAGES_WHITELIST]
+                                   [--images_allowlist IMAGES_ALLOWLIST]
                                    [--keep_bib]
                                    [--commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]]
                                    [--use_external_tikz USE_EXTERNAL_TIKZ]
@@ -140,7 +140,7 @@ optional arguments:
   --pdf_im_resolution PDF_IM_RESOLUTION
                         Resolution (in dpi) to which the tool resamples the
                         PDF images.
-  --images_whitelist IMAGES_WHITELIST
+  --images_allowlist IMAGES_ALLOWLIST
                         Images (and PDFs) that won't be resized to the default
                         resolution,but the one provided here. Value is pixel
                         for images, and dpi forPDFs, as in --im_size and
@@ -165,6 +165,15 @@ optional arguments:
                         the commands listed here duplicate that after
                         commands_to_delete, the default action will be retaining
                         the wrapped text.
+  --environments_to_delete ENVIRONMENTS_TO_DELETE [ENVIRONMENTS_TO_DELETE ...]
+                        LaTeX environments that will be deleted. Useful for e.g. 
+                        user-defined comment environments. For example, to 
+                        delete all occurrences of \begin{note} ... \end{note},
+                        run the tool with `--environments_to_delete note`. 
+                        Please note that the positional argument `input_folder`
+                        cannot come immediately after
+                        `environments_to_delete`, as the parser does not have
+                        any way to know if it's another environment to delete.
   --use_external_tikz USE_EXTERNAL_TIKZ
                         Folder (relative to input folder) containing
                         externalized tikz figures in PDF format.

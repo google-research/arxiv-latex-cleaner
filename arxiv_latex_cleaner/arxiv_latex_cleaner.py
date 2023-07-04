@@ -291,7 +291,7 @@ def _resize_and_copy_figure(filename, origin_folder, destination_folder,
     if max(im.size) > image_size:
       im = im.resize(
           tuple([int(x * float(image_size) / max(im.size)) for x in im.size]),
-          Image.ANTIALIAS)
+          Image.Resampling.LANCZOS)
     if os.path.splitext(filename)[1].lower() in ['.jpg', '.jpeg']:
       im.save(os.path.join(destination_folder, filename), 'JPEG', quality=90)
     elif os.path.splitext(filename)[1].lower() in ['.png']:
@@ -334,10 +334,10 @@ def _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits):
 
 def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
   image_size = collections.defaultdict(lambda: parameters['im_size'])
-  image_size.update(parameters['images_whitelist'])
+  image_size.update(parameters['images_allowlist'])
   pdf_resolution = collections.defaultdict(
       lambda: parameters['pdf_im_resolution'])
-  pdf_resolution.update(parameters['images_whitelist'])
+  pdf_resolution.update(parameters['images_allowlist'])
   for image_file in _keep_only_referenced(
       splits['figures'], contents, strict=False):
     _resize_and_copy_figure(

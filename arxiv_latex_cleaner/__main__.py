@@ -65,7 +65,7 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
-    "--images_whitelist",
+    "--images_allowlist",
     default={},
     type=json.loads,
     help=("Images (and PDFs) that won't be resized to the default resolution,"
@@ -115,7 +115,7 @@ PARSER.add_argument(
     required=False,
     help=(
         "LaTeX environments that will be deleted. Useful for e.g. user-"
-        "defined comment environments. For example, to delete all occurences "
+        "defined comment environments. For example, to delete all occurrences "
         "of \\begin{note} ... \\end{note}, run the tool with "
         "`--environments_to_delete note`. Please note that the positional "
         "argument `input_folder` cannot come immediately after "

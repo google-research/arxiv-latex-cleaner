@@ -28,12 +28,12 @@ def make_args(
     im_size=500,
     compress_pdf=False,
     pdf_im_resolution=500,
-    images_whitelist=None,
+    images_allowlist=None,
     commands_to_delete=None,
     use_external_tikz='foo/bar/tikz',
 ):
-  if images_whitelist is None:
-    images_whitelist = {}
+  if images_allowlist is None:
+    images_allowlist = {}
   if commands_to_delete is None:
     commands_to_delete = []
   args = {
@@ -42,7 +42,7 @@ def make_args(
       'im_size': im_size,
       'compress_pdf': compress_pdf,
       'pdf_im_resolution': pdf_im_resolution,
-      'images_whitelist': images_whitelist,
+      'images_allowlist': images_allowlist,
       'commands_to_delete': commands_to_delete,
       'use_external_tikz': use_external_tikz,
   }
@@ -223,7 +223,7 @@ class UnitTests(parameterized.TestCase):
               'args and config provided',
           'args':
               make_args(
-                  images_whitelist={'path1/': 1000},
+                  images_allowlist={'path1/': 1000},
                   commands_to_delete=[r'\todo1']),
           'config_params':
               make_args(
@@ -232,13 +232,13 @@ class UnitTests(parameterized.TestCase):
                   1000,
                   True,
                   1000,
-                  images_whitelist={'path2/': 1000},
+                  images_allowlist={'path2/': 1000},
                   commands_to_delete=[r'\todo2'],
                   use_external_tikz='foo_/bar_/tikz_',
               ),
           'final_args':
               make_args(
-                  images_whitelist={
+                  images_allowlist={
                       'path1/': 1000,
                       'path2/': 1000
                   },
@@ -743,7 +743,7 @@ class IntegrationTests(unittest.TestCase):
 
     arxiv_latex_cleaner.run_arxiv_cleaner({
         'input_folder': 'tex',
-        'images_whitelist': {
+        'images_allowlist': {
             'images/im2_included.jpg': 200,
             'images/im3_included.png': 400,
         },
