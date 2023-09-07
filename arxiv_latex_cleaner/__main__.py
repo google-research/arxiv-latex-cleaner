@@ -35,7 +35,7 @@ PARSER = argparse.ArgumentParser(
 )
 
 PARSER.add_argument(
-    "input_folder", type=str, help="Input folder containing the LaTeX code.")
+    "input_folder", type=str, help="Input folder or zip archive containing the LaTeX code.")
 
 PARSER.add_argument(
     "--resize_images",
