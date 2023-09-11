@@ -707,7 +707,7 @@ class UnitTests(parameterized.TestCase):
       self.assertEqual(matched, true_output, msg)
 
 
-class IntegrationTests(unittest.TestCase):
+class IntegrationTests(parameterized.TestCase):
 
   def setUp(self):
     super(IntegrationTests, self).setUp()
@@ -733,7 +733,11 @@ class IntegrationTests(unittest.TestCase):
           processed_content, groundtruth_content,
           '{:s} and {:s} are not equal.'.format(filename, filename_true))
 
-  def test_complete(self):
+  @parameterized.named_parameters(
+      {'testcase_name': 'from_dir',"input_dir":'tex'},
+      {'testcase_name': 'from_zip',"input_dir":'tex.zip'},
+  )
+  def test_complete(self, input_dir):
     out_path_true = 'tex_arXiv_true'
 
     # Make sure the folder does not exist, since we erase it in the test.
@@ -742,7 +746,7 @@ class IntegrationTests(unittest.TestCase):
           self.out_path))
 
     arxiv_latex_cleaner.run_arxiv_cleaner({
-        'input_folder': 'tex',
+        'input_folder': input_dir,
         'images_allowlist': {
             'images/im2_included.jpg': 200,
             'images/im3_included.png': 400,
@@ -771,6 +775,8 @@ class IntegrationTests(unittest.TestCase):
   def tearDown(self):
     shutil.rmtree(self.out_path)
     super(IntegrationTests, self).tearDown()
+
+
 
 
 if __name__ == '__main__':

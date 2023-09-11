@@ -14,9 +14,12 @@
 # limitations under the License.
 """Cleans the LaTeX code of your paper to submit to arXiv."""
 import collections
+import contextlib
 
 import copy
 import os
+from tempfile import tempdir
+import tempfile
 import regex
 import shutil
 import subprocess
@@ -487,7 +490,7 @@ def _split_all_files(parameters):
 
 def _create_out_folder(input_folder):
   """Creates the output folder, erasing it if existed."""
-  out_folder = os.path.abspath(input_folder) + '_arXiv'
+  out_folder = os.path.abspath(input_folder).removesuffix(".zip") + '_arXiv'
   _create_dir_erase_if_exists(out_folder)
 
   return out_folder
@@ -517,55 +520,65 @@ def run_arxiv_cleaner(parameters):
   logging.info('Collecting file structure.')
   parameters['output_folder'] = _create_out_folder(parameters['input_folder'])
 
-  splits = _split_all_files(parameters)
+  from_zip = parameters['input_folder'].endswith('.zip')
+  tempdir_context = tempfile.TemporaryDirectory() if from_zip else contextlib.suppress()
 
-  logging.info('Reading all tex files')
-  tex_contents = _read_all_tex_contents(
-      splits['tex_in_root'] + splits['tex_not_in_root'], parameters)
+  with tempdir_context as tempdir:
 
-  for tex_file in tex_contents:
-    logging.info('Removing comments in file %s.', tex_file)
-    tex_contents[tex_file] = _remove_comments_and_commands_to_delete(
-        tex_contents[tex_file], parameters)
+    if from_zip:
+      logging.info('Unzipping input folder.')
+      shutil.unpack_archive(parameters['input_folder'], tempdir)
+      parameters['input_folder'] = tempdir
 
-  for tex_file in tex_contents:
-    logging.info('Replacing \\includesvg calls in file %s.', tex_file)
-    tex_contents[tex_file] = _replace_includesvg(tex_contents[tex_file],
-                                                 splits['svg_inkscape'])
+    splits = _split_all_files(parameters)
 
-  for tex_file in tex_contents:
-    logging.info('Replacing Tikz Pictures in file %s.', tex_file)
-    content = _replace_tikzpictures(tex_contents[tex_file],
-                                    splits['external_tikz_figures'])
-    # If file ends with '\n' already, the split in last line would add an extra
-    # '\n', so we remove it.
-    tex_contents[tex_file] = content.split('\n')
+    logging.info('Reading all tex files')
+    tex_contents = _read_all_tex_contents(
+        splits['tex_in_root'] + splits['tex_not_in_root'], parameters)
 
-  _keep_only_referenced_tex(tex_contents, splits)
-  _add_root_tex_files(splits)
+    for tex_file in tex_contents:
+      logging.info('Removing comments in file %s.', tex_file)
+      tex_contents[tex_file] = _remove_comments_and_commands_to_delete(
+          tex_contents[tex_file], parameters)
 
-  for tex_file in splits['tex_to_copy']:
-    logging.info('Replacing patterns in file %s.', tex_file)
-    content = '\n'.join(tex_contents[tex_file])
-    content = _find_and_replace_patterns(
-        content, parameters.get('patterns_and_insertions', list()))
-    tex_contents[tex_file] = content
-    new_path = os.path.join(parameters['output_folder'], tex_file)
-    logging.info('Writing modified contents to %s.', new_path)
-    _write_file_content(
-        content,
-        new_path,
-    )
+    for tex_file in tex_contents:
+      logging.info('Replacing \\includesvg calls in file %s.', tex_file)
+      tex_contents[tex_file] = _replace_includesvg(tex_contents[tex_file],
+                                                  splits['svg_inkscape'])
 
-  full_content = '\n'.join(
-      ''.join(tex_contents[fn]) for fn in splits['tex_to_copy'])
-  _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
-  for non_tex_file in splits['non_tex_in_root']:
-    logging.info('Copying non-tex file %s.', non_tex_file)
-    _copy_file(non_tex_file, parameters)
+    for tex_file in tex_contents:
+      logging.info('Replacing Tikz Pictures in file %s.', tex_file)
+      content = _replace_tikzpictures(tex_contents[tex_file],
+                                      splits['external_tikz_figures'])
+      # If file ends with '\n' already, the split in last line would add an extra
+      # '\n', so we remove it.
+      tex_contents[tex_file] = content.split('\n')
 
-  _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
-  logging.info('Outputs written to %s', parameters['output_folder'])
+    _keep_only_referenced_tex(tex_contents, splits)
+    _add_root_tex_files(splits)
+
+    for tex_file in splits['tex_to_copy']:
+      logging.info('Replacing patterns in file %s.', tex_file)
+      content = '\n'.join(tex_contents[tex_file])
+      content = _find_and_replace_patterns(
+          content, parameters.get('patterns_and_insertions', list()))
+      tex_contents[tex_file] = content
+      new_path = os.path.join(parameters['output_folder'], tex_file)
+      logging.info('Writing modified contents to %s.', new_path)
+      _write_file_content(
+          content,
+          new_path,
+      )
+
+    full_content = '\n'.join(
+        ''.join(tex_contents[fn]) for fn in splits['tex_to_copy'])
+    _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
+    for non_tex_file in splits['non_tex_in_root']:
+      logging.info('Copying non-tex file %s.', non_tex_file)
+      _copy_file(non_tex_file, parameters)
+
+    _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
+    logging.info('Outputs written to %s', parameters['output_folder'])
 
 
 def strip_whitespace(text):
