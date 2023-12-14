@@ -120,7 +120,7 @@ patterns.
 ## Usage:
 
 ```
-usage: arxiv_latex_cleaner@v1.0.1 [-h] [--resize_images] [--im_size IM_SIZE]
+usage: arxiv_latex_cleaner@v1.0.2  [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
                                    [--images_allowlist IMAGES_ALLOWLIST]

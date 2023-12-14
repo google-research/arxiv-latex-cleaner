@@ -22,20 +22,25 @@ import argparse
 import json
 import logging
 
+import yaml
+
 from ._version import __version__
 from .arxiv_latex_cleaner import merge_args_into_config
 from .arxiv_latex_cleaner import run_arxiv_cleaner
 
-import yaml
-
 PARSER = argparse.ArgumentParser(
     prog="arxiv_latex_cleaner@{0}".format(__version__),
-    description=("Clean the LaTeX code of your paper to submit to arXiv. "
-                 "Check the README for more information on the use."),
+    description=(
+        "Clean the LaTeX code of your paper to submit to arXiv. "
+        "Check the README for more information on the use."
+    ),
 )
 
 PARSER.add_argument(
-    "input_folder", type=str, help="Input folder or zip archive containing the LaTeX code.")
+    "input_folder",
+    type=str,
+    help="Input folder or zip archive containing the LaTeX code.",
+)
 
 PARSER.add_argument(
     "--resize_images",
@@ -47,8 +52,10 @@ PARSER.add_argument(
     "--im_size",
     default=500,
     type=int,
-    help=("Size of the output images (in pixels, longest side). Fine tune this "
-          "to get as close to 10MB as possible."),
+    help=(
+        "Size of the output images (in pixels, longest side). Fine tune this "
+        "to get as close to 10MB as possible."
+    ),
 )
 
 PARSER.add_argument(
@@ -68,10 +75,12 @@ PARSER.add_argument(
     "--images_allowlist",
     default={},
     type=json.loads,
-    help=("Images (and PDFs) that won't be resized to the default resolution,"
-          "but the one provided here. Value is pixel for images, and dpi for"
-          "PDFs, as in --im_size and --pdf_im_resolution, respectively. Format "
-          "is a dictionary as: '{\"path/to/im.jpg\": 1000}'"),
+    help=(
+        "Images (and PDFs) that won't be resized to the default resolution,"
+        "but the one provided here. Value is pixel for images, and dpi for"
+        "PDFs, as in --im_size and --pdf_im_resolution, respectively. Format "
+        "is a dictionary as: '{\"path/to/im.jpg\": 1000}'"
+    ),
 )
 
 PARSER.add_argument(
@@ -91,7 +100,8 @@ PARSER.add_argument(
         "and \\todo2{}, run the tool with `--commands_to_delete todo1 todo2`."
         "Please note that the positional argument `input_folder` cannot come "
         "immediately after `commands_to_delete`, as the parser does not have "
-        "any way to know if it's another command to delete."),
+        "any way to know if it's another command to delete."
+    ),
 )
 
 PARSER.add_argument(
@@ -100,12 +110,13 @@ PARSER.add_argument(
     default=[],
     required=False,
     help=(
-        "LaTeX commands that will be deleted but the text wrapped in the "
-        "commands will be retained. Useful for commands that change text "
-        "formats and colors, which you may want to remove but keep the "
-        "text within. Usages are exactly the same as commands_to_delete. "
-        "Note that if the commands listed here duplicate that after "
-        "commands_to_delete, the default action will be retaining the wrapped text."),
+        "LaTeX commands that will be deleted but the text wrapped in the"
+        " commands will be retained. Useful for commands that change text"
+        " formats and colors, which you may want to remove but keep the text"
+        " within. Usages are exactly the same as commands_to_delete. Note that"
+        " if the commands listed here duplicate that after commands_to_delete,"
+        " the default action will be retaining the wrapped text."
+    ),
 )
 
 PARSER.add_argument(
@@ -120,14 +131,18 @@ PARSER.add_argument(
         "`--environments_to_delete note`. Please note that the positional "
         "argument `input_folder` cannot come immediately after "
         "`environments_to_delete`, as the parser does not have any way to "
-        "know if it's another environment to delete."),
+        "know if it's another environment to delete."
+    ),
 )
 
 PARSER.add_argument(
     "--use_external_tikz",
     type=str,
-    help=("Folder (relative to input folder) containing externalized tikz "
-          "figures in PDF format."))
+    help=(
+        "Folder (relative to input folder) containing externalized tikz "
+        "figures in PDF format."
+    ),
+)
 
 PARSER.add_argument(
     "--svg_inkscape",
@@ -143,15 +158,17 @@ PARSER.add_argument(
         "input folder), but a different path (relative to the input folder) "
         "can be provided in case a different `inkscapepath` was set when "
         "loading the `svg` package."
-    )
+    ),
 )
 
 PARSER.add_argument(
     "--config",
     type=str,
-    help=("Read settings from `.yaml` config file. If command line arguments "
-          "are provided additionally, the config file parameters are updated "
-          "with the command line parameters."),
+    help=(
+        "Read settings from `.yaml` config file. If command line arguments "
+        "are provided additionally, the config file parameters are updated "
+        "with the command line parameters."
+    ),
     required=False,
 )
 
