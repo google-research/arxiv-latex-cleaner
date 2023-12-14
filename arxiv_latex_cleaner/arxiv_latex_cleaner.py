@@ -24,6 +24,7 @@ import regex
 import shutil
 import subprocess
 import logging
+from pathlib import Path
 
 from PIL import Image
 
@@ -363,22 +364,18 @@ def _search_reference(filename, contents, strict=False):
     # \{[\s%]*path/to/img\.ext[\s%]*\}
     filename_regex = filename.replace('.', r'\.')
   else:
-    basename = os.path.basename(filename)
+    filename_path = Path(filename)
+
     # make extension optional
-    root, extension = os.path.splitext(basename)
-    unescaped_basename_regex = '{}({})?'.format(root, extension)
-    basename_regex = unescaped_basename_regex.replace('.', r'\.')
+    root, extension = filename_path.stem, filename_path.suffix
+    basename_regex = '{}({})?'.format(regex.escape(root), regex.escape(extension))
 
-    # since os.path.split only splits into two parts
-    # need to iterate and collect all the fragments
-    fragments = []
-    cur_head = os.path.dirname(filename)
-    while cur_head:
-      cur_head, tail = os.path.split(cur_head)
-      fragments.insert(0, tail)  # insert at the beginning
-
+    # iterate through parent fragments to make path prefix optional
     path_prefix_regex = ''
-    for fragment in fragments:
+    for fragment in reversed(filename_path.parents):
+      if fragment.name == '.':
+        continue
+      fragment = regex.escape(fragment.name)
       path_prefix_regex = '({}{}{})?'.format(path_prefix_regex, fragment,
                                              os.sep)
 
