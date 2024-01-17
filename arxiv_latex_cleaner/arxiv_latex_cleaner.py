@@ -194,35 +194,38 @@ def _remove_iffalse_block(text):
 
 
 def _remove_comments_inline(text):
-    """Removes the comments from the string 'text' and ignores % inside \\url{}."""
-    if "auto-ignore" in text:
-        return text
-    if text.lstrip(" ").lstrip("\t").startswith("%"):
-        return ""
+  """Removes the comments from the string 'text' and ignores % inside \\url{}."""
+  if 'auto-ignore' in text:
+    return text
+  if text.lstrip(' ').lstrip('\t').startswith('%'):
+    return ''
 
-    url_pattern = r"\\url\{(?>[^{}]|(?R))*\}"
-    def remove_comments(segment):
-        """
-        Remove comments from a segment of text.
-        """
-        if segment.lstrip().startswith("%"):
-            return ""
-        match = regex.search(r"(?<!\\)%", segment)
-        if match:
-            return segment[: match.end()] + "\n"
-        else:
-            return segment
+  url_pattern = r'\\url\{(?>[^{}]|(?R))*\}'
 
-    # split the text into segments based on \url{} tags
-    segments = regex.split(f"({url_pattern})", text)
+  def remove_comments(segment):
+    """Remove comments from a segment of text."""
+    if segment.lstrip().startswith('%'):
+      return ''
+    match = regex.search(r'(?<!\\)%', segment)
+    if match:
+      return segment[: match.end()] + '\n'
+    else:
+      return segment
 
-    for i in range(len(segments)):
-        # only process segments that are not part of a \url{} tag
-        if not regex.match(url_pattern, segments[i]):
-            segments[i] = remove_comments(segments[i])
+  # split the text into segments based on \url{} tags
+  segments = regex.split(f'({url_pattern})', text)
 
-    final_text = "".join(segments)
-    return final_text if final_text.endswith("\n") or final_text.endswith("\\n") else final_text + "\n"
+  for i in range(len(segments)):
+    # only process segments that are not part of a \url{} tag
+    if not regex.match(url_pattern, segments[i]):
+      segments[i] = remove_comments(segments[i])
+
+  final_text = ''.join(segments)
+  return (
+      final_text
+      if final_text.endswith('\n') or final_text.endswith('\\n')
+      else final_text + '\n'
+  )
 
 
 def _strip_tex_contents(lines, end_str):

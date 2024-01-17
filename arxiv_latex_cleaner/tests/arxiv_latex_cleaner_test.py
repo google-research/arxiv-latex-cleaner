@@ -293,6 +293,11 @@ class UnitTests(parameterized.TestCase):
           'line_in': 'Foo %Comment\n',
           'true_output': 'Foo %\n',
       },
+      {
+          'testcase_name': 'url_with_percent',
+          'line_in': '\\url{https://www.example.com/hello%20world}\n',
+          'true_output': '\\url{https://www.example.com/hello%20world}\n',
+      },
   )
   def test_remove_comments_inline(self, line_in, true_output):
     self.assertEqual(
