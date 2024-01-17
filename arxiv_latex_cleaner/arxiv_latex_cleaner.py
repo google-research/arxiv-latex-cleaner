@@ -209,7 +209,7 @@ def _remove_comments_inline(text):
             return ""
         match = regex.search(r"(?<!\\)%", segment)
         if match:
-            return segment[: match.start()] + "\n"
+            return segment[: match.end()] + "\n"
         else:
             return segment
 
@@ -222,7 +222,7 @@ def _remove_comments_inline(text):
             segments[i] = remove_comments(segments[i])
 
     final_text = "".join(segments)
-    return final_text if final_text.endswith("\n") else final_text + "\n"
+    return final_text if final_text.endswith("\n") or final_text.endswith("\\n") else final_text + "\n"
 
 
 def _strip_tex_contents(lines, end_str):
