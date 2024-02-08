@@ -111,11 +111,15 @@ def _remove_command(text, command, keep_text=False):
   Regex `base_pattern` used to match balanced parentheses taken from:
   https://stackoverflow.com/questions/546433/regular-expression-to-match-balanced-parentheses/35271017#35271017
   """
-  base_pattern = r'\\' + command + r'(?:\[(?:.*?)\])*\{((?:[^{}]+|\{(?1)\})*)\}(?:\[(?:.*?)\])*'
+  base_pattern = (
+      r'\\'
+      + command
+      + r'(?:\[(?:.*?)\])*\{((?:[^{}]+|\{(?1)\})*)\}(?:\[(?:.*?)\])*'
+  )
 
   def extract_text_inside_curly_braces(text):
     """Extract text inside of {} from command string"""
-    pattern = r"\{((?:[^{}]|(?R))*)\}"
+    pattern = r'\{((?:[^{}]|(?R))*)\}'
 
     match = regex.search(pattern, text)
 
@@ -135,10 +139,10 @@ def _remove_command(text, command, keep_text=False):
       has_match = True
 
       if not keep_text:
-          new_substring = ''
+        new_substring = ''
       else:
-          temp_substring = text[match.span()[0] : match.span()[1]]
-          new_substring = extract_text_inside_curly_braces(temp_substring)
+        temp_substring = text[match.span()[0] : match.span()[1]]
+        new_substring = extract_text_inside_curly_braces(temp_substring)
 
       if match.span()[1] < len(text):
         next_newline = text[match.span()[1] :].find('\n')
