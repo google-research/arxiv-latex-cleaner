@@ -330,6 +330,18 @@ class UnitTests(parameterized.TestCase):
           'true_output': 'A\n%\nD\n\\end{document}',
       },
       {
+          'testcase_name': 'command_with_optional_arguments_start',
+          'text_in': 'A\n\\todo[B]{C\nD}\nE\n\\end{document}',
+          'keep_text': False,
+          'true_output': 'A\n%\nE\n\\end{document}',
+      },
+      {
+          'testcase_name': 'command_with_optional_arguments_end',
+          'text_in': 'A\n\\todo{B\nC}[D]\nE\n\\end{document}',
+          'keep_text': False,
+          'true_output': 'A\n%\nE\n\\end{document}',
+      },
+      {
           'testcase_name': 'no_command_keep_text',
           'text_in': 'Foo\nFoo2\n',
           'keep_text': True,
@@ -358,6 +370,18 @@ class UnitTests(parameterized.TestCase):
           'text_in': 'A\n\\todo{B\n\\todo{C}}\nD\n\\end{document}',
           'keep_text': True,
           'true_output': 'A\nB\nC\nD\n\\end{document}',
+      },
+      {
+          'testcase_name': 'command_with_optional_arguments_start_keep_text',
+          'text_in': 'A\n\\todo[B]{C\nD}\nE\n\\end{document}',
+          'keep_text': True,
+          'true_output': 'A\nC\nD\nE\n\\end{document}',
+      },
+      {
+          'testcase_name': 'command_with_optional_arguments_end_keep_text',
+          'text_in': 'A\n\\todo{B\nC}[D]\nE\n\\end{document}',
+          'keep_text': True,
+          'true_output': 'A\nB\nC\nE\n\\end{document}',
       },
       {
           'testcase_name': 'deeply_nested_command_keep_text',
