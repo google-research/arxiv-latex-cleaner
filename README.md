@@ -148,7 +148,7 @@ optional arguments:
                         PDF images.
   --images_allowlist IMAGES_ALLOWLIST
                         Images (and PDFs) that won't be resized to the default
-                        resolution,but the one provided here. Value is pixel
+                        resolution, but the one provided here. Value is pixel
                         for images, and dpi forPDFs, as in --im_size and
                         --pdf_im_resolution, respectively. Format is a
                         dictionary as: '{"path/to/im.jpg": 1000}'
