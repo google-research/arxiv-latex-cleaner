@@ -18,11 +18,10 @@ import contextlib
 import copy
 import logging
 import os
-from pathlib import Path
+import pathlib
 import shutil
 import subprocess
 import tempfile
-from tempfile import tempdir
 
 from PIL import Image
 import regex
@@ -179,7 +178,7 @@ def _remove_environment(text, environment):
 
 
 def _remove_iffalse_block(text):
-  """Removes possibly nested r'\iffalse*\fi' blocks from 'text'."""
+  r"""Removes possibly nested '\iffalse*\fi' blocks from 'text'."""
   p = regex.compile(r'\\if\s*(\w+)|\\fi(?!\w)')
   level = -1
   positions_to_delete = []
@@ -440,7 +439,7 @@ def _search_reference(filename, contents, strict=False):
     # \{[\s%]*path/to/img\.ext[\s%]*\}
     filename_regex = filename.replace('.', r'\.')
   else:
-    filename_path = Path(filename)
+    filename_path = pathlib.Path(filename)
 
     # make extension optional
     root, extension = filename_path.stem, filename_path.suffix
