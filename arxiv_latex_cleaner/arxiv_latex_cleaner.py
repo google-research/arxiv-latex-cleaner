@@ -221,14 +221,14 @@ def _remove_comments_inline(text):
   url_pattern = r'\\url\{(?>[^{}]|(?R))*\}'
 
   def remove_comments(segment):
-    """Remove comments from a segment of text."""
+    """Check if a segment of text contains a comment and remove it."""
     if segment.lstrip().startswith('%'):
-      return ''
+      return '', True
     match = regex.search(r'(?<!\\)%', segment)
     if match:
-      return segment[: match.end()] + '\n'
+      return segment[: match.end()] + '\n', True
     else:
-      return segment
+      return segment, False
 
   # split the text into segments based on \url{} tags
   segments = regex.split(f'({url_pattern})', text)
@@ -236,7 +236,11 @@ def _remove_comments_inline(text):
   for i in range(len(segments)):
     # only process segments that are not part of a \url{} tag
     if not regex.match(url_pattern, segments[i]):
-      segments[i] = remove_comments(segments[i])
+      segments[i], match = remove_comments(segments[i])
+      if match:
+        # remove all segments after the first inline comment
+        segments = segments[: i + 1]
+        break
 
   final_text = ''.join(segments)
   return (
