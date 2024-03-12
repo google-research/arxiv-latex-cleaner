@@ -83,7 +83,7 @@ feature:
     \end{tikzpicture}` with the respective
     `\includegraphics{EXTERNAL_TIKZ_FOLDER/picture_name.pdf}`.
 *   Requires externally compiled TikZ pictures as `.pdf` files in folder
-    `EXTERNAL_TIKZ_FOLDER`. See section 53 in the
+    `EXTERNAL_TIKZ_FOLDER`. See section 52 (Externalization Library) in the
     [PGF/TikZ manual](https://ctan.org/pkg/pgf?lang=en) on TikZ picture
     externalization.
 *   Only replaces environments with preceding
