@@ -279,6 +279,16 @@ class UnitTests(parameterized.TestCase):
           'true_output': '%auto-ignore\n',
       },
       {
+          'testcase_name': 'auto_ignore_middle',
+          'line_in': 'Foo %auto-ignore Bar\n',
+          'true_output': 'Foo %auto-ignore Bar\n',
+      },
+      {
+          'testcase_name': 'auto_ignore_text_with_comment',
+          'line_in': 'Foo auto-ignore % Comment\n',
+          'true_output': 'Foo auto-ignore %\n',
+      },
+      {
           'testcase_name': 'percent',
           'line_in': r'100\% accurate\n',
           'true_output': r'100\% accurate\n',
