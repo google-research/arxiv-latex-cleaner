@@ -212,7 +212,7 @@ def _remove_iffalse_block(text):
 
 def _remove_comments_inline(text):
   """Removes the comments from the string 'text' and ignores % inside \\url{}."""
-  if 'auto-ignore' in text:
+  if '%auto-ignore' in text.split():
     return text
   if text.lstrip(' ').lstrip('\t').startswith('%'):
     return ''
