@@ -280,8 +280,8 @@ class UnitTests(parameterized.TestCase):
       },
       {
           'testcase_name': 'auto_ignore_middle',
-          'line_in': 'Foo %auto-ignore Bar\n',
-          'true_output': 'Foo %auto-ignore Bar\n',
+          'line_in': 'Foo % auto-ignore Comment\n',
+          'true_output': 'Foo % auto-ignore\n',
       },
       {
           'testcase_name': 'auto_ignore_text_with_comment',
