@@ -212,8 +212,10 @@ def _remove_iffalse_block(text):
 
 def _remove_comments_inline(text):
   """Removes the comments from the string 'text' and ignores % inside \\url{}."""
-  if '%auto-ignore' in text.split():
-    return text
+  auto_ignore_pattern = r'(%\s*auto-ignore).*'
+  if regex.search(auto_ignore_pattern, text):
+    return regex.sub(auto_ignore_pattern, r'\1', text)
+
   if text.lstrip(' ').lstrip('\t').startswith('%'):
     return ''
 
