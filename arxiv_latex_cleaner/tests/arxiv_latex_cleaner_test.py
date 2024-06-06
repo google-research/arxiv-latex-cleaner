@@ -608,12 +608,30 @@ class UnitTests(parameterized.TestCase):
       },
       {
           'testcase_name': 'includesvg_match_with_options',
-          'text_in': 'Foo\\includesvg[width=\\linewidth]{test2}\nFoo',
+          'text_in': 'Foo\\includesvg[width=\\linewidth,scale=0.40]{figs/persdf/test2}\nFoo',
           'figures_in': [
               'ext_svg/test1-tex.pdf_tex',
               'ext_svg/test2-tex.pdf_tex',
           ],
-          'true_output': 'Foo\\includeinkscape[width=\\linewidth]{ext_svg/test2-tex.pdf_tex}\nFoo',
+          'true_output': 'Foo\\includeinkscape[width=\\linewidth,scale=0.40]{ext_svg/test2-tex.pdf_tex}\nFoo',
+      },
+      {
+          'testcase_name': 'includesvg_match_with_options_with_suffix',
+          'text_in': 'Foo\\includesvg[width=\\linewidth]{figs/test2.svg}\nFoo',
+          'figures_in': [
+              'ext_svg/test1-tex.pdf_tex',
+              'ext_svg/test2_svg-tex.pdf_tex',
+          ],
+          'true_output': 'Foo\\includeinkscape[width=\\linewidth]{ext_svg/test2_svg-tex.pdf_tex}\nFoo',
+      },
+       {
+          'testcase_name': 'includesvg_match_with_options_with_dot_with_suffix',
+          'text_in': 'Foo\\includesvg[width=\\linewidth]{figs/test2-0.9.svg}\nFoo',
+          'figures_in': [
+              'ext_svg/test1-tex.pdf_tex',
+              'ext_svg/test2-0.9_svg-tex.pdf_tex',
+          ],
+          'true_output': 'Foo\\includeinkscape[width=\\linewidth]{ext_svg/test2-0.9_svg-tex.pdf_tex}\nFoo',
       },
   )
   def test_replace_includesvg(self, text_in, figures_in, true_output):
