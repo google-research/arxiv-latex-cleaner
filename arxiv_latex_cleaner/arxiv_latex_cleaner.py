@@ -328,8 +328,7 @@ def _replace_includesvg(content, svg_inkscape_files):
   def repl_svg(matchobj):
     svg_path = matchobj.group(2)
     if svg_path.endswith('.svg'):
-       s = svg_path.rsplit('.', 1)
-       svg_path = '_'.join(s)
+      svg_path = '_'.join(svg_path.rsplit('.', 1))
     svg_filename = os.path.basename(svg_path)
 
     # search in svg_inkscape split if pdf_tex file is available
@@ -338,7 +337,7 @@ def _replace_includesvg(content, svg_inkscape_files):
     )
     if len(matching_pdf_tex_files) == 1:
       options = '' if matchobj.group(1) is None else matchobj.group(1)
-      res =  f'\\includeinkscape{options}{{{matching_pdf_tex_files[0]}}}'
+      res = f'\\includeinkscape{options}{{{matching_pdf_tex_files[0]}}}'
       return res
     else:
       return matchobj.group(0)
