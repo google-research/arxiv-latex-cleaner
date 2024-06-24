@@ -177,28 +177,93 @@ def _remove_environment(text, environment):
   )
 
 
-def _remove_iffalse_block(text):
-  r"""Removes possibly nested '\iffalse*\fi' blocks from 'text'."""
-  p = regex.compile(r'\\if\s*(\w+)|\\fi(?!\w)')
-  level = -1
-  positions_to_delete = []
-  start, end = 0, 0
-  for m in p.finditer(text):
-    if (
-        m.group().replace(' ', '') == r'\iffalse'
-        or m.group().replace(' ', '') == r'\if0'
-    ) and level == -1:
-      level += 1
-      start = m.start()
-    elif m.group().startswith(r'\if') and level >= 0:
-      level += 1
-    elif m.group() == r'\fi' and level >= 0:
-      if level == 0:
-        end = m.end()
-        positions_to_delete.append((start, end))
-      level -= 1
+def _simplify_conditional_blocks(text):
+  r"""Simplify possibly nested conditional blocks from 'text'.
+
+  For example, `\iffalse TEST1\else TEST2\fi` is simplified to `TEST2`,
+  and `\iftrue TEST1\else TEST2\fi` is simplified to `TEST1`.
+  Unknown conditionals are left untouched.
+
+  Raises a ValueError if an unmatched \if or \else is found.
+  """
+  p = regex.compile(r'(?!(?<=\\newif\s*))\\if\s*(\w+)|\\else(?!\w)|\\fi(?!\w)')
+  toplevel_tree = { "left": [], "kind": "toplevel", "parent": None }
+
+  tree = toplevel_tree
+
+  def new_subtree(kind):
+    return {  "kind": kind, "left": [], "right": [] }
+  
+  def add_subtree(tree, subtree):
+    if "else" not in tree:
+      tree["left"].append(subtree)
     else:
-      pass
+      tree["right"].append(subtree)
+    subtree["parent"] = tree
+
+  for m in p.finditer(text):
+    m_no_space = m.group().replace(' ', '')
+    if (m_no_space == r'\iffalse' or m_no_space == r'\if0'):
+      subtree = new_subtree("iffalse")
+      subtree["start"] = m
+      add_subtree(tree, subtree)
+      tree = subtree
+    elif (m_no_space == r'\iftrue' or m_no_space == r'\if1'):
+      subtree = new_subtree("iftrue")
+      subtree["start"] = m
+      add_subtree(tree, subtree)
+      tree = subtree
+    elif m_no_space.startswith(r'\if'):
+      subtree = new_subtree("unknown")
+      subtree["start"] = m
+      add_subtree(tree, subtree)
+      tree = subtree
+    elif (m_no_space == r'\else'):
+      if tree["parent"] is None:
+        os.sys.stderr.write('Warning: Ignoring unmatched \\else!\n')
+        continue
+      tree['else'] = m
+    elif m.group() == r'\fi':
+      if tree["parent"] is None:
+        os.sys.stderr.write('Warning: Ignoring unmatched \\fi!\n')
+        continue
+      tree["end"] = m
+      tree = tree["parent"]
+    else:
+      raise ValueError('Unreachable!')
+  if tree["parent"] is not None:
+    raise ValueError(f"Unmatched {tree['start'].group()}")
+
+  positions_to_delete = []
+  
+  def traverse_tree(tree):
+    if tree["kind"] == "iffalse":
+      if "else" in tree:
+        positions_to_delete.append((tree["start"].start(), tree["else"].end()))
+        for subtree in tree["right"]:
+          traverse_tree(subtree)
+        positions_to_delete.append((tree["end"].start(), tree["end"].end()))
+      else:
+        positions_to_delete.append((tree["start"].start(), tree["end"].end()))
+    elif tree["kind"] == "iftrue":
+      if "else" in tree:
+        positions_to_delete.append((tree["start"].start(), tree["start"].end()))
+        for subtree in tree["left"]:
+          traverse_tree(subtree)
+        positions_to_delete.append((tree["else"].start(), tree["end"].end()))
+      else:
+        positions_to_delete.append((tree["start"].start(), tree["start"].end()))
+        positions_to_delete.append((tree["end"].start(), tree["end"].end()))
+    elif tree["kind"] == "unknown":
+      for subtree in tree["left"]:
+        traverse_tree(subtree)
+      for subtree in tree["right"]:
+        traverse_tree(subtree)
+    else:
+      raise ValueError('Unreachable!')
+
+  for tree in toplevel_tree["left"]:
+    traverse_tree(tree)
 
   for start, end in reversed(positions_to_delete):
     if end < len(text) and text[end].isspace():
@@ -288,7 +353,7 @@ def _remove_comments_and_commands_to_delete(content, parameters):
   """Erases all LaTeX comments in the content, and writes it."""
   content = [_remove_comments_inline(line) for line in content]
   content = _remove_environment(''.join(content), 'comment')
-  content = _remove_iffalse_block(content)
+  content = _simplify_conditional_blocks(content)
   for environment in parameters.get('environments_to_delete', []):
     content = _remove_environment(content, environment)
   for command in parameters.get('commands_only_to_delete', []):

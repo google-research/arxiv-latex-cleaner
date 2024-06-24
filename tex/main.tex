@@ -36,6 +36,9 @@ from this one.
 \end{mynote}
 
 \newif\ifvar
+\newif  \ifvarII
+
+\ifvarII asdf \fi
 
 \ifvar
 \if    false
@@ -50,6 +53,11 @@ Text
 \fi
 \fi
 \fi
+
+\iffalse I shall be gone (iffalse block)!\else Expect me (else block of iffalse)!\fi
+
+\iftrue Expect me (iftrue block)!\else I shall be gone (else block of iftrue)!\fi
+
 
 \newcommand{\red}[1]{{\color{red} #1}}
 hello test \red{hello

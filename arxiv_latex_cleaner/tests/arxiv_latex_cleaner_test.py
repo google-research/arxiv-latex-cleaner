@@ -476,10 +476,35 @@ class UnitTests(parameterized.TestCase):
           'text_in': '\\newcommand\\figref[1]{Figure~\\ref{fig:\#1}}',
           'true_output': '\\newcommand\\figref[1]{Figure~\\ref{fig:\#1}}',
       },
+      {
+          'testcase_name': 'iffalse_else_sustained',
+          'text_in': '\\iffalse not there\\else here\\fi',
+          'true_output': 'here',
+      },
+      {
+          'testcase_name': 'iftrue_else_removed',
+          'text_in': '\\iftrue expected\\else not expected\\fi',
+          'true_output': 'expected',
+      },
+      {
+          'testcase_name': 'if0_removed',
+          'text_in': '\\if0 to be removed\\fi',
+          'true_output': '',
+      },
+      {
+          'testcase_name': 'if1 works',
+          'text_in': '\\if 1 expected\\fi',
+          'true_output': 'expected',
+      },
+      {
+          'testcase_name': 'new_if_ignored',
+          'text_in': '\\newif  \\ifvar \\ifvar\iffalse test\\fi\\fi',
+          'true_output': '\\newif  \\ifvar \\ifvar\\fi',
+      },
   )
-  def test_remove_iffalse_block(self, text_in, true_output):
+  def test_simplify_conditional_blocks(self, text_in, true_output):
     self.assertEqual(
-        arxiv_latex_cleaner._remove_iffalse_block(text_in), true_output
+        arxiv_latex_cleaner._simplify_conditional_blocks(text_in), true_output
     )
 
   @parameterized.named_parameters(
@@ -899,7 +924,7 @@ class IntegrationTests(parameterized.TestCase):
     # Checks the set of files is the same as in the true folder.
     out_files = set(arxiv_latex_cleaner._list_all_files(self.out_path))
     out_files_true = set(arxiv_latex_cleaner._list_all_files(out_path_true))
-    self.assertEqual(out_files, out_files_true)
+    self.assertSetEqual(out_files, out_files_true)
 
     # Compares the contents of each file against the true value.
     for f1 in out_files:
