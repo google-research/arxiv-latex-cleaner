@@ -501,6 +501,16 @@ class UnitTests(parameterized.TestCase):
           'text_in': '\\newif  \\ifvar \\ifvar\\iffalse test\\fi\\fi',
           'true_output': '\\newif  \\ifvar \\ifvar\\fi',
       },
+      {
+          'testcase_name': 'known exceptions (iff) ignored in \\iffalse',
+          'text_in': '\\iffalse \\iff\\fi',
+          'true_output': '',
+      },
+      {
+          'testcase_name': 'known exceptions (iff) ignored in \\iftrue',
+          'text_in': '\\iftrue\\iff\\else\\fi',
+          'true_output': '\\iff',
+      },
   )
   def test_simplify_conditional_blocks(self, text_in, true_output):
     self.assertEqual(
@@ -918,6 +928,7 @@ class IntegrationTests(parameterized.TestCase):
         'pdf_im_resolution': 500,
         'commands_to_delete': ['mytodo'],
         'commands_only_to_delete': ['red'],
+        'if_exceptions': ['iffalt'],
         'environments_to_delete': ['mynote'],
         'use_external_tikz': 'ext_tikz',
         'keep_bib': False,

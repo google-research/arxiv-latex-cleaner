@@ -135,6 +135,35 @@ PARSER.add_argument(
     ),
 )
 
+def if_prefixed(orig_string):
+  if orig_string.startswith("\\"):
+    string = orig_string[1:]
+  else:
+    string = orig_string
+  if not string.startswith("if"):
+    raise argparse.ArgumentTypeError(
+        f"Expected a string starting with 'if', got '{orig_string}'!"
+    )
+  return string
+
+PARSER.add_argument(
+    "--if_exceptions",
+    nargs="+",
+    default=[],
+    required=False,
+    type=if_prefixed,
+    help=(
+        "Constant TeX primitive conditionals (\\iffalse, \\iftrue, etc.) are "
+        "simplified, i.e., true branches are kept, false branches deleted. "
+        "To parse the conditional constructs correctly, all commands starting "
+        "with `\\if` are assumed to be TeX primitive conditionals (e.g., "
+        "declared by \\newif\\ifvar). Some known exceptions to this rule are "
+        "already included (e.g., \\iff, \\ifthenelse, etc.), but you can add "
+        "custom exceptions using `--if_exceptions iffalt`."
+    ),
+)
+
+
 PARSER.add_argument(
     "--use_external_tikz",
     type=str,
