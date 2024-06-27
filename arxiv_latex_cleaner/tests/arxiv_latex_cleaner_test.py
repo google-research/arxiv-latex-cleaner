@@ -473,8 +473,8 @@ class UnitTests(parameterized.TestCase):
       },
       {
           'testcase_name': 'commands_not_removed',
-          'text_in': '\\newcommand\\figref[1]{Figure~\\ref{fig:\#1}}',
-          'true_output': '\\newcommand\\figref[1]{Figure~\\ref{fig:\#1}}',
+          'text_in': '\\newcommand\\figref[1]{Figure~\\ref{fig:\\#1}}',
+          'true_output': '\\newcommand\\figref[1]{Figure~\\ref{fig:\\#1}}',
       },
       {
           'testcase_name': 'iffalse_else_sustained',
@@ -498,7 +498,7 @@ class UnitTests(parameterized.TestCase):
       },
       {
           'testcase_name': 'new_if_ignored',
-          'text_in': '\\newif  \\ifvar \\ifvar\iffalse test\\fi\\fi',
+          'text_in': '\\newif  \\ifvar \\ifvar\\iffalse test\\fi\\fi',
           'true_output': '\\newif  \\ifvar \\ifvar\\fi',
       },
   )
@@ -649,9 +649,11 @@ class UnitTests(parameterized.TestCase):
           ],
           'true_output': 'Foo\\includeinkscape[width=\\linewidth]{ext_svg/test2_svg-tex.pdf_tex}\nFoo',
       },
-       {
+      {
           'testcase_name': 'includesvg_match_with_options_with_dot_with_suffix',
-          'text_in': 'Foo\\includesvg[width=\\linewidth]{figs/test2-0.9.svg}\nFoo',
+          'text_in': (
+              'Foo\\includesvg[width=\\linewidth]{figs/test2-0.9.svg}\nFoo'
+          ),
           'figures_in': [
               'ext_svg/test1-tex.pdf_tex',
               'ext_svg/test2-0.9_svg-tex.pdf_tex',

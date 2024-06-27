@@ -187,82 +187,82 @@ def _simplify_conditional_blocks(text):
   Raises a ValueError if an unmatched \if or \else is found.
   """
   p = regex.compile(r'(?!(?<=\\newif\s*))\\if\s*(\w+)|\\else(?!\w)|\\fi(?!\w)')
-  toplevel_tree = { "left": [], "kind": "toplevel", "parent": None }
+  toplevel_tree = {'left': [], 'kind': 'toplevel', 'parent': None}
 
   tree = toplevel_tree
 
   def new_subtree(kind):
-    return {  "kind": kind, "left": [], "right": [] }
-  
+    return {'kind': kind, 'left': [], 'right': []}
+
   def add_subtree(tree, subtree):
-    if "else" not in tree:
-      tree["left"].append(subtree)
+    if 'else' not in tree:
+      tree['left'].append(subtree)
     else:
-      tree["right"].append(subtree)
-    subtree["parent"] = tree
+      tree['right'].append(subtree)
+    subtree['parent'] = tree
 
   for m in p.finditer(text):
     m_no_space = m.group().replace(' ', '')
-    if (m_no_space == r'\iffalse' or m_no_space == r'\if0'):
-      subtree = new_subtree("iffalse")
-      subtree["start"] = m
+    if m_no_space == r'\iffalse' or m_no_space == r'\if0':
+      subtree = new_subtree('iffalse')
+      subtree['start'] = m
       add_subtree(tree, subtree)
       tree = subtree
-    elif (m_no_space == r'\iftrue' or m_no_space == r'\if1'):
-      subtree = new_subtree("iftrue")
-      subtree["start"] = m
+    elif m_no_space == r'\iftrue' or m_no_space == r'\if1':
+      subtree = new_subtree('iftrue')
+      subtree['start'] = m
       add_subtree(tree, subtree)
       tree = subtree
     elif m_no_space.startswith(r'\if'):
-      subtree = new_subtree("unknown")
-      subtree["start"] = m
+      subtree = new_subtree('unknown')
+      subtree['start'] = m
       add_subtree(tree, subtree)
       tree = subtree
-    elif (m_no_space == r'\else'):
-      if tree["parent"] is None:
+    elif m_no_space == r'\else':
+      if tree['parent'] is None:
         os.sys.stderr.write('Warning: Ignoring unmatched \\else!\n')
         continue
       tree['else'] = m
     elif m.group() == r'\fi':
-      if tree["parent"] is None:
+      if tree['parent'] is None:
         os.sys.stderr.write('Warning: Ignoring unmatched \\fi!\n')
         continue
-      tree["end"] = m
-      tree = tree["parent"]
+      tree['end'] = m
+      tree = tree['parent']
     else:
       raise ValueError('Unreachable!')
-  if tree["parent"] is not None:
+  if tree['parent'] is not None:
     raise ValueError(f"Unmatched {tree['start'].group()}")
 
   positions_to_delete = []
-  
+
   def traverse_tree(tree):
-    if tree["kind"] == "iffalse":
-      if "else" in tree:
-        positions_to_delete.append((tree["start"].start(), tree["else"].end()))
-        for subtree in tree["right"]:
+    if tree['kind'] == 'iffalse':
+      if 'else' in tree:
+        positions_to_delete.append((tree['start'].start(), tree['else'].end()))
+        for subtree in tree['right']:
           traverse_tree(subtree)
-        positions_to_delete.append((tree["end"].start(), tree["end"].end()))
+        positions_to_delete.append((tree['end'].start(), tree['end'].end()))
       else:
-        positions_to_delete.append((tree["start"].start(), tree["end"].end()))
-    elif tree["kind"] == "iftrue":
-      if "else" in tree:
-        positions_to_delete.append((tree["start"].start(), tree["start"].end()))
-        for subtree in tree["left"]:
+        positions_to_delete.append((tree['start'].start(), tree['end'].end()))
+    elif tree['kind'] == 'iftrue':
+      if 'else' in tree:
+        positions_to_delete.append((tree['start'].start(), tree['start'].end()))
+        for subtree in tree['left']:
           traverse_tree(subtree)
-        positions_to_delete.append((tree["else"].start(), tree["end"].end()))
+        positions_to_delete.append((tree['else'].start(), tree['end'].end()))
       else:
-        positions_to_delete.append((tree["start"].start(), tree["start"].end()))
-        positions_to_delete.append((tree["end"].start(), tree["end"].end()))
-    elif tree["kind"] == "unknown":
-      for subtree in tree["left"]:
+        positions_to_delete.append((tree['start'].start(), tree['start'].end()))
+        positions_to_delete.append((tree['end'].start(), tree['end'].end()))
+    elif tree['kind'] == 'unknown':
+      for subtree in tree['left']:
         traverse_tree(subtree)
-      for subtree in tree["right"]:
+      for subtree in tree['right']:
         traverse_tree(subtree)
     else:
       raise ValueError('Unreachable!')
 
-  for tree in toplevel_tree["left"]:
+  for tree in toplevel_tree['left']:
     traverse_tree(tree)
 
   for start, end in reversed(positions_to_delete):
