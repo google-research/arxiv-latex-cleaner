@@ -126,7 +126,11 @@ usage: arxiv_latex_cleaner@v1.0.7  [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--images_allowlist IMAGES_ALLOWLIST]
                                    [--keep_bib]
                                    [--commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]]
+                                   [--commands_only_to_delete COMMANDS_ONLY_TO_DELETE [COMMANDS_ONLY_TO_DELETE ...]]
+                                   [--environments_to_delete ENVIRONMENTS_TO_DELETE [ENVIRONMENTS_TO_DELETE ...]]
+                                   [--if_exceptions IF_EXCEPTIONS [IF_EXCEPTIONS ...]]
                                    [--use_external_tikz USE_EXTERNAL_TIKZ]
+                                   [--svg_inkscape [SVG_INKSCAPE]]
                                    [--config CONFIG] [--verbose]
                                    input_folder
 
@@ -180,6 +184,15 @@ optional arguments:
                         cannot come immediately after
                         `environments_to_delete`, as the parser does not have
                         any way to know if it's another environment to delete.
+  --if_exceptions IF_EXCEPTIONS [IF_EXCEPTIONS ...]
+                        Constant TeX primitive conditionals (\iffalse, \iftrue,
+                        etc.) are simplified, i.e., true branches are kept, false
+                        branches deleted. To parse the conditional constructs
+                        correctly, all commands starting with `\if` are assumed to
+                        be TeX primitive conditionals (e.g., declared by
+                        \newif\ifvar). Some known exceptions to this rule are
+                        already included (e.g., \iff, \ifthenelse, etc.), but you
+                        can add custom exceptions using `--if_exceptions iffalt`.
   --use_external_tikz USE_EXTERNAL_TIKZ
                         Folder (relative to input folder) containing
                         externalized tikz figures in PDF format.
