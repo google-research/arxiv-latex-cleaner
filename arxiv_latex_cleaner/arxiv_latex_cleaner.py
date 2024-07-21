@@ -177,7 +177,7 @@ def _remove_environment(text, environment):
   )
 
 
-def _simplify_conditional_blocks(text, if_exceptions = []):
+def _simplify_conditional_blocks(text, if_exceptions=[]):
   r"""Simplify possibly nested conditional blocks from 'text'.
 
   For example, `\iffalse TEST1\else TEST2\fi` is simplified to `TEST2`,
@@ -188,29 +188,67 @@ def _simplify_conditional_blocks(text, if_exceptions = []):
   to stderr and return the original text.
   """
   p = regex.compile(r'(?!(?<=\\newif\s*))\\if\s*(\w+)|\\else(?!\w)|\\fi(?!\w)')
-  toplevel_tree = {'left': [], "right": [], 'kind': 'toplevel', 'parent': None}
+  toplevel_tree = {'left': [], 'right': [], 'kind': 'toplevel', 'parent': None}
 
   tree = toplevel_tree
 
   exceptions = [
-    # TeX primitives
-    "iff",
-    # package etoolbox
-    "ifpatchable", "ifpatchable*", "ifbool", "iftoggle", "ifdef", "ifcsdef",
-    "ifundef", "ifcsundef", "ifdefmacro", "ifcsmacro", "ifdefparam",
-    "ifcsparam", "ifcsprefix", "ifdefprotected", "ifcsprotected",
-    "ifdefltxprotect", "ifcsltxprotect", "ifdefempty", "ifcsempty",
-    "ifdefvoid", "ifcsvoid", "ifdefequal", "ifcsequal", "ifdefstring",
-    "ifcsstring", "ifdefstrequal", "ifcsstrequal", "ifdefcounter",
-    "ifcscounter", "ifltxcounter", "ifdeflength", "ifcslength", "ifdefdimen",
-    "ifcsdimen", "ifstrequal", "ifstrempty", "ifblank", "ifnumcomp",
-    "ifnumequal", "ifnumodd", "ifdimcomp", "ifdimequal", "ifdimgreater",
-    "ifdimless", "ifboolexpr", "ifboolexpe", "ifinlist", "ifinlistcs",
-    "ifrmnum",
-    # package hyperref
-    "ifpdfstringunicode",
-    # package ifthen
-    "ifthenelse"
+      # TeX primitives
+      'iff',
+      # package etoolbox
+      'ifpatchable',
+      'ifpatchable*',
+      'ifbool',
+      'iftoggle',
+      'ifdef',
+      'ifcsdef',
+      'ifundef',
+      'ifcsundef',
+      'ifdefmacro',
+      'ifcsmacro',
+      'ifdefparam',
+      'ifcsparam',
+      'ifcsprefix',
+      'ifdefprotected',
+      'ifcsprotected',
+      'ifdefltxprotect',
+      'ifcsltxprotect',
+      'ifdefempty',
+      'ifcsempty',
+      'ifdefvoid',
+      'ifcsvoid',
+      'ifdefequal',
+      'ifcsequal',
+      'ifdefstring',
+      'ifcsstring',
+      'ifdefstrequal',
+      'ifcsstrequal',
+      'ifdefcounter',
+      'ifcscounter',
+      'ifltxcounter',
+      'ifdeflength',
+      'ifcslength',
+      'ifdefdimen',
+      'ifcsdimen',
+      'ifstrequal',
+      'ifstrempty',
+      'ifblank',
+      'ifnumcomp',
+      'ifnumequal',
+      'ifnumodd',
+      'ifdimcomp',
+      'ifdimequal',
+      'ifdimgreater',
+      'ifdimless',
+      'ifboolexpr',
+      'ifboolexpe',
+      'ifinlist',
+      'ifinlistcs',
+      'ifrmnum',
+      # package hyperref
+      'ifpdfstringunicode',
+      # package ifthen
+      'ifthenelse',
   ] + if_exceptions
 
   def new_subtree(kind):
@@ -224,22 +262,30 @@ def _simplify_conditional_blocks(text, if_exceptions = []):
     subtree['parent'] = tree
 
   def print_tree(tree, indent, write):
-    if "start" in tree:
-      write(' ' * indent + tree["start"].group() + "\n")
-    for subtree in tree["left"]:
+    if 'start' in tree:
+      write(' ' * indent + tree['start'].group() + '\n')
+    for subtree in tree['left']:
       print_tree(subtree, indent + 2, write)
-    if "else" in tree:
-      write(' ' * indent + tree["else"].group() + "\n")
-    for subtree in tree["right"]:
+    if 'else' in tree:
+      write(' ' * indent + tree['else'].group() + '\n')
+    for subtree in tree['right']:
       print_tree(subtree, indent + 2)
-    if "end" in tree:
-      write(' ' * indent + tree["end"].group() + "\n")
+    if 'end' in tree:
+      write(' ' * indent + tree['end'].group() + '\n')
 
   def print_abort(error_finding):
-    os.sys.stderr.write(f"Warning: Found {error_finding}! Not removing any conditional blocks...\n")
-    os.sys.stderr.write(f"         This is the matched tree (as built up to the error):\n")
+    os.sys.stderr.write(
+        f'Warning: Found {error_finding}! Not removing any conditional'
+        ' blocks...\n'
+    )
+    os.sys.stderr.write(
+        f'         This is the matched tree (as built up to the error):\n'
+    )
     print_tree(toplevel_tree, indent=9, write=os.sys.stderr.write)
-    os.sys.stderr.write(f"         Potentially, you need to supply an exception using --if_exceptions'.\n")
+    os.sys.stderr.write(
+        f'         Potentially, you need to supply an exception using'
+        f" --if_exceptions'.\n"
+    )
 
   for m in p.finditer(text):
     m_no_space = m.group().replace(' ', '')
@@ -264,7 +310,7 @@ def _simplify_conditional_blocks(text, if_exceptions = []):
       if tree['parent'] is None:
         print_abort(r'unmatched \else')
         return text
-      elif "else" in tree:
+      elif 'else' in tree:
         print_abort(r'duplicate \else')
         return text
 
@@ -402,7 +448,9 @@ def _remove_comments_and_commands_to_delete(content, parameters):
   """Erases all LaTeX comments in the content, and writes it."""
   content = [_remove_comments_inline(line) for line in content]
   content = _remove_environment(''.join(content), 'comment')
-  content = _simplify_conditional_blocks(content, parameters.get('if_exceptions', []))
+  content = _simplify_conditional_blocks(
+      content, parameters.get('if_exceptions', [])
+  )
   for environment in parameters.get('environments_to_delete', []):
     content = _remove_environment(content, environment)
   for command in parameters.get('commands_only_to_delete', []):
