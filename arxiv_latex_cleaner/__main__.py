@@ -88,6 +88,23 @@ PARSER.add_argument(
     action="store_true",
     help="Avoid deleting the *.bib files.",
 )
+PARSER.add_argument(
+    "--flattening",
+    action="store_true",
+    help="Compress all tex files to single file.",
+)
+PARSER.add_argument(
+    "--use_tex_log_for_figs",
+    default=None,
+    type=str,
+    help="use the output.log file for full references of the figures (if exists). Default: None",
+)
+PARSER.add_argument(
+    "--main_tex",
+    default=None,
+    type=str,
+    help="main tex name in root to use",
+)
 
 PARSER.add_argument(
     "--commands_to_delete",

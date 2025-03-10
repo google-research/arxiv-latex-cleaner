@@ -571,12 +571,55 @@ def _resize_pdf_figure(
 
 def _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits):
   for fn in _keep_only_referenced(
-      splits['non_tex_not_in_root'], contents, strict=True
+      splits['non_tex_not_in_root'], contents, strict=False
   ):
     _copy_file(fn, parameters)
 
+def _flat_latex(parameters, contents, splits):
+    main_content = _read_file_content(os.path.join(parameters['output_folder'], parameters['main_tex']))
+    def remove_empty_dirs(file_path):
+        folder_path = os.path.dirname(file_path)
+        if not os.listdir(folder_path):  # If empty, remove it
+            os.rmdir(folder_path)
+            remove_empty_dirs(folder_path)
+    while True:
+        processed_content = []
+        added_flag = False
 
-def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
+        for line in main_content:
+            match = regex.search(r'\\input\{([^}]+)\}', line)
+            if not match:
+                processed_content.append(line)
+                continue
+            filename = match.group(1)
+            file = [fn for fn in splits['tex_to_copy'] if filename in fn]
+            if len(file) > 1:
+                file = [fn for fn in splits['tex_to_copy'] if filename + '.tex' in fn]
+            if len(file) == 0: # no match
+                logging.error(f'Missing match to : {filename} ; in : {splits["tex_to_copy"]}')
+                logging.error(f'Line: {line}')
+                processed_content.append(line)
+                continue
+            assert len(file)==1
+            fn = file[0]
+            added_flag = True
+            file_path = os.path.join(parameters['output_folder'], fn)
+            inserted_content = _read_file_content(file_path)
+            processed_content.extend(inserted_content)
+            os.remove(file_path)
+            remove_empty_dirs(file_path)
+        main_content = processed_content.copy()
+        if not added_flag:
+            break
+        # if not '\input{' in ''.join():
+        #     break
+    _write_file_content(
+        ''.join(main_content),
+        os.path.join(parameters['output_folder'], parameters['main_tex']),
+    )
+
+
+def _resize_and_copy_figures_if_referenced(parameters, contents, splits, strict=False):
   image_size = collections.defaultdict(lambda: parameters['im_size'])
   image_size.update(parameters['images_allowlist'])
   pdf_resolution = collections.defaultdict(
@@ -584,7 +627,7 @@ def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
   )
   pdf_resolution.update(parameters['images_allowlist'])
   for image_file in _keep_only_referenced(
-      splits['figures'], contents, strict=False
+      splits['figures'], contents, strict=strict
   ):
     _resize_and_copy_figure(
         filename=image_file,
@@ -635,6 +678,8 @@ def _search_reference(filename, contents, strict=False):
 
   # Pads with braces and optional whitespace/comment characters.
   patn = r'\{{[\s%]*{}[\s%]*\}}'.format(filename_regex)
+  if strict: # make optional {} over file_name (relevant to strict=True for figs with log file)
+    patn = r'(\{{)?[\s%]*{}[\s%]*(\}})?'.format(filename_regex)
   # Picture references in LaTeX are allowed to be in different cases.
   return regex.search(patn, contents, regex.IGNORECASE)
 
@@ -651,27 +696,30 @@ def _keep_only_referenced(filenames, contents, strict=False):
   ]
 
 
-def _keep_only_referenced_tex(contents, splits):
+def _keep_only_referenced_tex(contents, splits, start_with=None):
   """Returns the filenames referenced from the tex files themselves.
 
   It needs various iterations in case one file is referenced from an
   unreferenced file.
   """
   old_referenced = set(splits['tex_in_root'] + splits['tex_not_in_root'])
+  prev_referenced = {}
+  referenced = {start_with} if start_with is not None else set(splits['tex_in_root'])
+  next_referenced = referenced.copy()
+  # print(f'start_with: {start_with}')
   while True:
-    referenced = set(splits['tex_in_root'])
     for fn in old_referenced:
-      for fn2 in old_referenced:
+      for fn2 in referenced:
         if regex.search(
-            r'(' + os.path.splitext(fn)[0] + r'[.}])', '\n'.join(contents[fn2])
+            r'(?<!\w)(' + os.path.splitext(fn)[0] + r'[.}])', '\n'.join(contents[fn2])
         ):
-          referenced.add(fn)
+          next_referenced.add(fn)
 
-    if referenced == old_referenced:
+    if referenced == next_referenced:
       splits['tex_to_copy'] = list(referenced)
       return
 
-    old_referenced = referenced.copy()
+    referenced = next_referenced.copy()
 
 
 def _add_root_tex_files(splits):
@@ -696,6 +744,9 @@ def _split_all_files(parameters):
           if os.path.isfile(os.path.join(parameters['input_folder'], f))
       ],
   }
+  if not any(file.endswith('.bbl') for file in file_splits['in_root']) and not parameters['keep_bib']:
+      print("A .bbl file is not exists in the folder. Maybe use KEEP bib ?")
+      parameters['keep_bib'] = True
 
   file_splits['not_in_root'] = [
       f for f in file_splits['all'] if f not in file_splits['in_root']
@@ -714,6 +765,9 @@ def _split_all_files(parameters):
 
   file_splits['tex_in_root'] = _keep_pattern(
       file_splits['to_copy_in_root'], ['.tex$', '.tikz$']
+  )
+  file_splits['texlog_in_root'] = _keep_pattern(
+      file_splits['to_copy_in_root'], ['.log$']
   )
   file_splits['tex_not_in_root'] = _keep_pattern(
       file_splits['to_copy_not_in_root'], ['.tex$', '.tikz$']
@@ -743,9 +797,10 @@ def _split_all_files(parameters):
   return file_splits
 
 
-def _create_out_folder(input_folder):
+def _create_out_folder(input_folder, suffix=None):
   """Creates the output folder, erasing it if existed."""
-  out_folder = os.path.abspath(input_folder).removesuffix('.zip') + '_arXiv'
+  suffix = suffix or '_arXiv'
+  out_folder = os.path.abspath(input_folder).removesuffix('.zip') + suffix
   _create_dir_erase_if_exists(out_folder)
 
   return out_folder
@@ -759,7 +814,7 @@ def run_arxiv_cleaner(parameters):
       r'\.sh$',
       r'\.blg$',
       r'\.brf$',
-      r'\.log$',
+      # r'\.log$',
       r'\.out$',
       r'\.ps$',
       r'\.dvi$',
@@ -792,7 +847,10 @@ def run_arxiv_cleaner(parameters):
   })
 
   logging.info('Collecting file structure.')
-  parameters['output_folder'] = _create_out_folder(parameters['input_folder'])
+  suffix_folder = os.path.splitext(parameters['main_tex'])[0]
+  if parameters['flattening']:
+      suffix_folder += '_flat'
+  parameters['output_folder'] = _create_out_folder(parameters['input_folder'], suffix='_'+suffix_folder)
 
   from_zip = parameters['input_folder'].endswith('.zip')
   tempdir_context = (
@@ -834,8 +892,9 @@ def run_arxiv_cleaner(parameters):
       # '\n', so we remove it.
       tex_contents[tex_file] = content.split('\n')
 
-    _keep_only_referenced_tex(tex_contents, splits)
-    _add_root_tex_files(splits)
+    _keep_only_referenced_tex(tex_contents, splits, start_with=parameters['main_tex'])
+    if parameters['main_tex'] is None: # add all tex in root if the main is unknown
+        _add_root_tex_files(splits)
 
     for tex_file in splits['tex_to_copy']:
       logging.info('Replacing patterns in file %s.', tex_file)
@@ -859,8 +918,20 @@ def run_arxiv_cleaner(parameters):
       logging.info('Copying non-tex file %s.', non_tex_file)
       _copy_file(non_tex_file, parameters)
 
-    _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
+    if parameters['use_tex_log_for_figs'] and (parameters['use_tex_log_for_figs'] in splits['texlog_in_root']):
+      logfile_name = parameters['use_tex_log_for_figs'] # splits['texlog_in_root'][0]
+      logging.info(f'use_tex_log_for_figs={logfile_name}')
+      full_content = '\n' + ''.join(_read_file_content(os.path.join(parameters['input_folder'], logfile_name)))
+      for fname in splits['texlog_in_root']:
+        os.remove(os.path.join(parameters['output_folder'], fname))
+    elif parameters['use_tex_log_for_figs']:
+      logging.error(f'Error, missing log file {parameters["use_tex_log_for_figs"]} in {splits["texlog_in_root"]}')
+
+    _resize_and_copy_figures_if_referenced(parameters, full_content, splits, strict=True)
     logging.info('Outputs written to %s', parameters['output_folder'])
+
+    if parameters['flattening']:
+      _flat_latex(parameters, full_content, splits)
 
 
 def strip_whitespace(text):
