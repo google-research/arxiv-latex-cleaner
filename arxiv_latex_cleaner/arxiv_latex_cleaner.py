@@ -517,6 +517,7 @@ def _resize_and_copy_figure(
     image_size,
     compress_pdf,
     pdf_resolution,
+    png_to_jpg_compress=False,
 ):
   """Resizes and copies the input figure (either JPG, PNG, or PDF)."""
   _create_dir_if_not_exists(
@@ -536,8 +537,13 @@ def _resize_and_copy_figure(
       )
     if os.path.splitext(filename)[1].lower() in ['.jpg', '.jpeg']:
       im.save(os.path.join(destination_folder, filename), 'JPEG', quality=90)
-    elif os.path.splitext(filename)[1].lower() in ['.png']:
+    elif os.path.splitext(filename)[1].lower() in ['.png'] and not png_to_jpg_compress:
       im.save(os.path.join(destination_folder, filename), 'PNG')
+    elif os.path.splitext(filename)[1].lower() in ['.png'] and png_to_jpg_compress:
+      new_filename = os.path.splitext(filename)[0] + ".jpg"
+      im = im.convert("RGB")  # Convert PNG to RGB (to support JPEG format)
+      im.save(os.path.join(destination_folder, new_filename), 'JPEG', quality=90)
+
 
   elif compress_pdf and os.path.splitext(filename)[1].lower() == '.pdf':
     _resize_pdf_figure(
@@ -637,6 +643,7 @@ def _resize_and_copy_figures_if_referenced(parameters, contents, splits, strict=
         image_size=image_size[image_file],
         compress_pdf=parameters['compress_pdf'],
         pdf_resolution=pdf_resolution[image_file],
+        png_to_jpg_compress=parameters['png_to_jpg_compress']
     )
 
 
@@ -918,14 +925,18 @@ def run_arxiv_cleaner(parameters):
       logging.info('Copying non-tex file %s.', non_tex_file)
       _copy_file(non_tex_file, parameters)
 
-    if parameters['use_tex_log_for_figs'] and (parameters['use_tex_log_for_figs'] in splits['texlog_in_root']):
-      logfile_name = parameters['use_tex_log_for_figs'] # splits['texlog_in_root'][0]
-      logging.info(f'use_tex_log_for_figs={logfile_name}')
-      full_content = '\n' + ''.join(_read_file_content(os.path.join(parameters['input_folder'], logfile_name)))
+    if parameters['use_tex_log_for_figs'] and (parameters['use_tex_log_for_figs'] in splits['texlog_in_root']+['ALL'] ):
+      logfile_name = [parameters['use_tex_log_for_figs']] # splits['texlog_in_root'][0]
+      if parameters['use_tex_log_for_figs']=='ALL':
+          logfile_name = splits['texlog_in_root'].copy()
+      full_content = ''
+      for logfile_n in logfile_name:
+          logging.info(f'use_tex_log_for_figs={logfile_n}')
+          full_content += '\n' + ''.join(_read_file_content(os.path.join(parameters['input_folder'], logfile_n)))
       for fname in splits['texlog_in_root']:
         os.remove(os.path.join(parameters['output_folder'], fname))
     elif parameters['use_tex_log_for_figs']:
-      logging.error(f'Error, missing log file {parameters["use_tex_log_for_figs"]} in {splits["texlog_in_root"]}')
+      logging.error(f'Error, missing log file {parameters["use_tex_log_for_figs"]} in {splits["texlog_in_root"]}/ALL')
 
     _resize_and_copy_figures_if_referenced(parameters, full_content, splits, strict=True)
     logging.info('Outputs written to %s', parameters['output_folder'])
