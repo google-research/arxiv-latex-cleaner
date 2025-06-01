@@ -522,9 +522,15 @@ def _resize_and_copy_figure(
     verbose=False
 ):
     """Resizes and copies the input figure (either JPG, PNG, or PDF).
-    
-    New parameters:
-        convert_png_to_jpg: Convert PNG files to JPG format
+
+    Parameters:
+        filename: The input filename
+        origin_folder: The folder containing the input filename
+        destination_folder: The folder to copy the output filename to
+        resize_image: Whether to resize the image
+        image_size: The maximum size of the image in pixels
+        compress_pdf: Whether to compress the PDF file
+        convert_png_to_jpg: Whether to convert PNG files to JPG format. Note that this will override resize_image for PNG files.
         png_quality: JPG quality for converted PNG files (0-100)
         png_size_threshold: Minimum file size in MB to apply quality reduction
         verbose: Enable verbose logging
@@ -623,23 +629,40 @@ def _update_image_references(tex_contents_dict, old_filename, new_filename, verb
         
         content_changed = False
         
-        # Pattern 1: Direct filename with extension
-        pattern1 = r'(\{[^}]*?)' + regex.escape(old_filename) + r'(\})'
+        # Pattern 1: Direct filename with full extension, handling comments and newlines
+        pattern1 = r'(\{(?:%\s*\n\s*)?[^}]*?)' + regex.escape(old_filename) + r'((?:%\s*\n\s*)?[^}]*?\})'
         replacement1 = r'\1' + new_filename + r'\2'
         
-        new_content = regex.sub(pattern1, replacement1, content, flags=regex.IGNORECASE)
+        new_content = regex.sub(pattern1, replacement1, content, flags=regex.IGNORECASE | regex.DOTALL)
         if new_content != content:
             content = new_content
             content_changed = True
-        
-        # Pattern 2: Base filename with optional .png extension
-        pattern2 = r'(\{[^}]*?)' + regex.escape(old_base) + r'(\.png)?(\})'
-        replacement2 = r'\1' + new_base + r'.jpg\3'
-        
-        new_content = regex.sub(pattern2, replacement2, content, flags=regex.IGNORECASE)
-        if new_content != content:
-            content = new_content
-            content_changed = True
+            if verbose:
+                print(f"Applied pattern 1 (full filename) in {tex_file}")
+        else:
+            # Pattern 2: Base filename without extension, handling comments and newlines
+            # Only apply this if Pattern 1 didn't match to avoid double replacements
+            pattern2 = r'(\{(?:%\s*\n\s*)?[^}]*?)' + regex.escape(old_base) + r'((?:%\s*\n\s*)?[^}]*?\})'
+            replacement2 = r'\1' + new_base + r'.jpg\2'
+            
+            new_content = regex.sub(pattern2, replacement2, content, flags=regex.IGNORECASE | regex.DOTALL)
+            if new_content != content:
+                content = new_content
+                content_changed = True
+                if verbose:
+                    print(f"Applied pattern 2 (base filename) in {tex_file}")
+            else:
+                # Pattern 3: Handle cases where extension is split across lines with comments
+                # This specifically targets patterns like: images/filename%\n.png
+                pattern3 = r'(\{[^}]*?)' + regex.escape(old_base) + r'(%\s*\n\s*)(\.png)([^}]*?\})'
+                replacement3 = r'\1' + new_base + r'\2.jpg\4'
+                
+                new_content = regex.sub(pattern3, replacement3, content, flags=regex.IGNORECASE | regex.DOTALL)
+                if new_content != content:
+                    content = new_content
+                    content_changed = True
+                    if verbose:
+                        print(f"Applied pattern 3 (split extension) in {tex_file}")
         
         # Update the content back in the appropriate format
         if content_changed:

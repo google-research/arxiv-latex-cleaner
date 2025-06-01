@@ -193,7 +193,7 @@ PARSER.add_argument(
 PARSER.add_argument(
     "--convert_png_to_jpg",
     action="store_true",
-    help="Convert PNG images to JPG format to reduce file size",
+    help="Convert PNG images to JPG format to reduce file size. Note that this will override --resize_images for PNG files.",
 )
 
 PARSER.add_argument(
