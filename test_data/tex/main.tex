@@ -1,0 +1,97 @@
+\begin{document}
+Text
+% Whole line comment
+
+Text% Inline comment
+\begin{comment}
+This is an environment comment.
+\end{comment}
+
+This is a percent \%.
+% Whole line comment without newline
+\includegraphics{images/im1_included.png}
+%\includegraphics{images/im_not_included}
+\includegraphics{images/im3_included.png}
+\includegraphics{%
+  images/im4_included.png%
+  }
+\includegraphics[width=.5\linewidth]{%
+  images/im5_included.jpg}
+%\includegraphics{%
+%  images/im4_not_included.png
+%  }
+%\includegraphics[width=.5\linewidth]{%
+%  images/im5_not_included.jpg}
+
+% test whatever the path satrting with dot works when include graphics
+\includegraphics{./images/im3_included.png}
+
+This line should\mytodo{Do this later} not be separated
+\mytodo{This is a todo command with a nested \textit{command}.
+Please remember that up to \texttt{2 levels} of \textit{nesting} are supported.}
+from this one.
+
+\begin{mynote}
+  This is a custom environment that could be excluded.
+\end{mynote}
+
+\newif\ifvar
+\newif  \ifvarII
+
+\ifvarII asdf \fi
+
+\ifvar
+\if    false
+\if false
+\if 0
+\iffalse
+\ifvar
+Text
+\fi
+\fi
+\fi
+\fi
+\fi
+\fi
+
+\iffalse I shall be gone (iffalse block)!\else Expect me (else block of iffalse)!\fi
+
+\iftrue Expect me (iftrue block)!\else I shall be gone (else block of iftrue)!\fi
+
+\iffalse
+\iffalt
+\fi
+
+\newcommand{\red}[1]{{\color{red} #1}}
+hello test \red{hello
+test \red{hello}}
+test
+
+% content after this line should not be cleaned if \end{document} is in a comment
+
+\input{figures/figure_included.tex}
+% \input{figures/figure_not_included.tex}
+
+% Test for tikzpicture feature
+% should be replaced
+\tikzsetnextfilename{test1}
+\begin{tikzpicture}
+    \node (test) at (0,0) {Test1};
+\end{tikzpicture}
+
+% should be replaced in included file
+\input{figures/figure_included.tikz}
+
+% should not be be replaced - no preceding tikzsetnextfilename command
+\begin{tikzpicture}
+    \node (test) at (0,0) {Test3};
+\end{tikzpicture}
+
+\tikzsetnextfilename{test_no_match}
+\begin{tikzpicture}
+    \node (test) at (0,0) {Test4};
+\end{tikzpicture}
+
+\end{document}
+
+This should be ignored.
