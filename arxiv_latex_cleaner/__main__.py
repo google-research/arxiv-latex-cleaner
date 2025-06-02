@@ -191,6 +191,26 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--convert_png_to_jpg",
+    action="store_true",
+    help="Convert PNG images to JPG format to reduce file size. Note that this will override --resize_images for PNG files.",
+)
+
+PARSER.add_argument(
+    "--png_quality",
+    type=int,
+    default=50,
+    help="JPG quality for PNG conversion (0-100, default: 50)",
+)
+
+PARSER.add_argument(
+    "--png_size_threshold",
+    type=float,
+    default=0.5,
+    help="Minimum PNG file size in MB to apply quality reduction (default: 0.5)",
+)
+
+PARSER.add_argument(
     "--config",
     type=str,
     help=(

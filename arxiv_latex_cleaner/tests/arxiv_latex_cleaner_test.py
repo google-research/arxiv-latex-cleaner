@@ -877,7 +877,7 @@ class IntegrationTests(parameterized.TestCase):
 
   def setUp(self):
     super(IntegrationTests, self).setUp()
-    self.out_path = 'tex_arXiv'
+    self.out_path = 'test_data/tex_arXiv'
 
   def _compare_files(self, filename, filename_true):
     if path.splitext(filename)[1].lower() in ['.jpg', '.jpeg', '.png']:
@@ -904,11 +904,11 @@ class IntegrationTests(parameterized.TestCase):
       )
 
   @parameterized.named_parameters(
-      {'testcase_name': 'from_dir', 'input_dir': 'tex'},
-      {'testcase_name': 'from_zip', 'input_dir': 'tex.zip'},
+      {'testcase_name': 'from_dir', 'input_dir': 'test_data/tex'},
+      {'testcase_name': 'from_zip', 'input_dir': 'test_data/tex.zip'},
   )
   def test_complete(self, input_dir):
-    out_path_true = 'tex_arXiv_true'
+    out_path_true = 'test_data/tex_arXiv_true'
 
     # Make sure the folder does not exist, since we erase it in the test.
     if path.isdir(self.out_path):
@@ -945,10 +945,59 @@ class IntegrationTests(parameterized.TestCase):
           path.join(self.out_path, f1), path.join(out_path_true, f1)
       )
 
+  @parameterized.named_parameters(
+      {'testcase_name': 'from_dir', 'input_dir': 'test_data/tex'},
+      {'testcase_name': 'from_zip', 'input_dir': 'test_data/tex.zip'},
+  )
+  def test_png2jpg(self, input_dir):
+    out_path_true = 'test_data/tex_arXiv_png2jpg_true'
+
+    # Make sure the folder does not exist, since we erase it in the test.
+    if path.isdir(self.out_path):
+      raise RuntimeError(
+          'The folder {:s} should not exist.'.format(self.out_path)
+      )
+
+    arxiv_latex_cleaner.run_arxiv_cleaner({
+        'input_folder': input_dir,
+        'images_allowlist': {
+            # 'images/im2_included.jpg': 200,
+            # 'images/im3_included.png': 400,
+        },
+        'resize_images': False,
+        'im_size': 100,
+        'compress_pdf': False,
+        'pdf_im_resolution': 500,
+        'commands_to_delete': ['mytodo'],
+        'commands_only_to_delete': ['red'],
+        'if_exceptions': ['iffalt'],
+        'environments_to_delete': ['mynote'],
+        'use_external_tikz': 'ext_tikz',
+        'keep_bib': False,
+        'convert_png_to_jpg': True,
+        'png_quality': 50,
+        'png_size_threshold': 0.5,
+    })
+
+    # Checks the set of files is the same as in the true folder.
+    out_files = set(arxiv_latex_cleaner._list_all_files(self.out_path))
+    out_files_true = set(arxiv_latex_cleaner._list_all_files(out_path_true))
+    self.assertSetEqual(out_files, out_files_true)
+
+    # Compares the contents of each file against the true value.
+    for f1 in out_files:
+      if path.splitext(path.join(self.out_path, f1))[1].lower() in ['.jpg', '.jpeg', '.png']:
+        # check if all png files have been renamed to jpg
+        self.assertTrue(path.splitext(f1)[1].lower() != '.png', f'{f1} is not renamed to jpg')
+
+      else:
+        self._compare_files(
+            path.join(self.out_path, f1), path.join(out_path_true, f1)
+        )
+
   def tearDown(self):
     shutil.rmtree(self.out_path)
     super(IntegrationTests, self).tearDown()
-
 
 if __name__ == '__main__':
   unittest.main()

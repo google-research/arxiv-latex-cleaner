@@ -73,6 +73,7 @@ There is a 50MB limit on arXiv submissions, so to make it fit:
 *   Optionally compresses `.pdf` files using ghostscript (Linux and Mac only).
     You can allowlist some PDFs to skip the global size using
     `images_allowlist`.
+*   Optionally converts PNG images to JPG format to reduce file size.
 
 #### TikZ picture source code concealment
 
@@ -131,6 +132,9 @@ usage: arxiv_latex_cleaner@v1.0.8  [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--if_exceptions IF_EXCEPTIONS [IF_EXCEPTIONS ...]]
                                    [--use_external_tikz USE_EXTERNAL_TIKZ]
                                    [--svg_inkscape [SVG_INKSCAPE]]
+                                   [--convert_png_to_jpg]
+                                   [--png_quality PNG_QUALITY]
+                                   [--png_size_threshold PNG_SIZE_THRESHOLD]
                                    [--config CONFIG] [--verbose]
                                    input_folder
 
@@ -207,6 +211,11 @@ optional arguments:
                         (relative to the input folder) can be provided in case a
                         different `inkscapepath` was set when loading the `svg`
                         package.
+  --convert_png_to_jpg  Convert PNG images to JPG format to reduce file size
+  --png_quality PNG_QUALITY
+                        JPG quality for PNG conversion (0-100, default: 50)
+  --png_size_threshold PNG_SIZE_THRESHOLD
+                        Minimum PNG file size in MB to apply quality reduction (default: 0.5)
   --config CONFIG       Read settings from `.yaml` config file. If command
                         line arguments are provided additionally, the config
                         file parameters are updated with the command line
