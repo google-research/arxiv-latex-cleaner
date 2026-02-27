@@ -95,13 +95,16 @@ def _list_all_files(in_folder, ignore_dirs=None):
 
 
 def _copy_file(filename, params):
+  # Determine output filename based on flatten_files setting
+  output_filename = _flatten_filename(filename) if params.get('flatten_files', False) else filename
   _create_dir_if_not_exists(
-      os.path.join(params['output_folder'], os.path.dirname(filename))
+      os.path.join(params['output_folder'], os.path.dirname(output_filename))
   )
   shutil.copy(
       os.path.join(params['input_folder'], filename),
-      os.path.join(params['output_folder'], filename),
+      os.path.join(params['output_folder'], output_filename),
   )
+  return output_filename
 
 
 def _remove_command(text, command, keep_text=False):
@@ -519,6 +522,7 @@ def _resize_and_copy_figure(
     convert_png_to_jpg=False,
     png_quality=50,
     png_size_threshold=0.5,
+    flatten_files=False,
     verbose=False
 ):
     """Resizes and copies the input figure (either JPG, PNG, or PDF).
@@ -533,13 +537,16 @@ def _resize_and_copy_figure(
         convert_png_to_jpg: Whether to convert PNG files to JPG format. Note that this will override resize_image for PNG files.
         png_quality: JPG quality for converted PNG files (0-100)
         png_size_threshold: Minimum file size in MB to apply quality reduction
+        flatten_files: Whether to flatten directory structure
         verbose: Enable verbose logging
-    
+
     Returns:
-        str: The actual output filename (may differ from input if PNG was converted)
+        str: The actual output filename (may differ from input if PNG was converted or flattened)
     """
+    # Determine output filename based on flatten_files setting
+    output_filename = _flatten_filename(filename) if flatten_files else filename
     _create_dir_if_not_exists(
-        os.path.join(destination_folder, os.path.dirname(filename))
+        os.path.join(destination_folder, os.path.dirname(output_filename))
     )
     
     if convert_png_to_jpg and os.path.splitext(filename)[1].lower() in ['.png']:
@@ -554,15 +561,18 @@ def _resize_and_copy_figure(
             quality = png_quality
             if verbose:
                 print(f"Converting PNG to JPG with quality {quality}: {filename}")
-        
-        # Convert PNG to JPG
-        output_filename = os.path.splitext(filename)[0] + '.jpg'
+
+        # Convert PNG to JPG, with flattening if enabled
+        if flatten_files:
+            output_filename = _flatten_filename(os.path.splitext(filename)[0] + '.jpg')
+        else:
+            output_filename = os.path.splitext(filename)[0] + '.jpg'
         rgb_img = im.convert('RGB')
         rgb_img.save(os.path.join(destination_folder, output_filename), 'JPEG', quality=quality)
-        
+
         if verbose:
             print(f"Converted: {filename} -> {output_filename}")
-          
+
         return output_filename
                     
     if resize_image and os.path.splitext(filename)[1].lower() in [
@@ -577,36 +587,36 @@ def _resize_and_copy_figure(
                     tuple([int(x * float(image_size) / max(im.size)) for x in im.size]),
                     Image.Resampling.LANCZOS,
                 )
-            
+
             if os.path.splitext(filename)[1].lower() in ['.jpg', '.jpeg']:
-                im.save(os.path.join(destination_folder, filename), 'JPEG', quality=90)
-                return filename
-                
+                im.save(os.path.join(destination_folder, output_filename), 'JPEG', quality=90)
+                return output_filename
+
             elif os.path.splitext(filename)[1].lower() in ['.png']:
-                im.save(os.path.join(destination_folder, filename), 'PNG')
-                return filename
-                    
+                im.save(os.path.join(destination_folder, output_filename), 'PNG')
+                return output_filename
+
         except Exception as e:
             if verbose:
                 print(f"Failed to process image {filename}: {e}")
             # Fall back to simple copy
             shutil.copy(
                 os.path.join(origin_folder, filename),
-                os.path.join(destination_folder, filename),
+                os.path.join(destination_folder, output_filename),
             )
-            return filename
+            return output_filename
 
     elif compress_pdf and os.path.splitext(filename)[1].lower() == '.pdf':
         _resize_pdf_figure(
-            filename, origin_folder, destination_folder, pdf_resolution
+            filename, origin_folder, destination_folder, pdf_resolution, output_filename
         )
-        return filename
+        return output_filename
     else:
         shutil.copy(
             os.path.join(origin_folder, filename),
-            os.path.join(destination_folder, filename),
+            os.path.join(destination_folder, output_filename),
         )
-        return filename
+        return output_filename
 
 
 def _update_image_references(tex_contents_dict, old_filename, new_filename, verbose=False):
@@ -683,10 +693,12 @@ def _update_image_references(tex_contents_dict, old_filename, new_filename, verb
 
 
 def _resize_pdf_figure(
-    filename, origin_folder, destination_folder, resolution, timeout=10
+    filename, origin_folder, destination_folder, resolution, output_filename=None, timeout=10
 ):
+  if output_filename is None:
+    output_filename = filename
   input_file = os.path.join(origin_folder, filename)
-  output_file = os.path.join(destination_folder, filename)
+  output_file = os.path.join(destination_folder, output_filename)
   bash_command = PDF_RESIZE_COMMAND.format(
       input=input_file, output=output_file, resolution=resolution
   )
@@ -702,24 +714,28 @@ def _resize_pdf_figure(
 
 
 def _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits):
+  filename_changes = {}  # Track filename changes when flattening
   for fn in _keep_only_referenced(
       splits['non_tex_not_in_root'], contents, strict=True
   ):
-    _copy_file(fn, parameters)
+    output_filename = _copy_file(fn, parameters)
+    if output_filename != fn:
+      filename_changes[fn] = output_filename
+  return filename_changes
 
 def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
-    """Modified to handle PNG to JPG conversion and reference updates."""
+    """Modified to handle PNG to JPG conversion, flattening, and reference updates."""
     image_size = collections.defaultdict(lambda: parameters['im_size'])
     image_size.update(parameters['images_allowlist'])
     pdf_resolution = collections.defaultdict(
         lambda: parameters['pdf_im_resolution']
     )
     pdf_resolution.update(parameters['images_allowlist'])
-    
+
     # contents is the full content string for reference checking
-    
-    filename_changes = {}  # Track PNG -> JPG filename changes
-    
+
+    filename_changes = {}  # Track PNG -> JPG and flattening filename changes
+
     for image_file in _keep_only_referenced(
         splits['figures'], contents, strict=False
     ):
@@ -734,13 +750,14 @@ def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
             convert_png_to_jpg=parameters.get('convert_png_to_jpg', False),
             png_quality=parameters.get('png_quality', 50),
             png_size_threshold=parameters.get('png_size_threshold', 0.5),
+            flatten_files=parameters.get('flatten_files', False),
             verbose=parameters.get('verbose', False)
         )
-        
+
         # Track filename changes for reference updates
         if actual_output_filename != image_file:
             filename_changes[image_file] = actual_output_filename
-    
+
     return filename_changes
 
 
@@ -990,8 +1007,12 @@ def run_arxiv_cleaner(parameters):
       content = _find_and_replace_patterns(
           content, parameters.get('patterns_and_insertions', list())
       )
+      if parameters.get('flatten_files', False):
+        content = _flatten_input_paths(content)
       tex_contents[tex_file] = content
-      new_path = os.path.join(parameters['output_folder'], tex_file)
+      # Determine output path (flattened or original)
+      out_file = _flatten_filename(tex_file) if parameters.get('flatten_files', False) else tex_file
+      new_path = os.path.join(parameters['output_folder'], out_file)
       logging.info('Writing modified contents to %s.', new_path)
       _write_file_content(
           content,
@@ -1001,12 +1022,20 @@ def run_arxiv_cleaner(parameters):
     full_content = '\n'.join(
         ''.join(tex_contents[fn]) for fn in splits['tex_to_copy']
     )
-    _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
+    # Collect filename changes from non-tex files (for flattening)
+    non_tex_filename_changes = _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
     for non_tex_file in splits['non_tex_in_root']:
       logging.info('Copying non-tex file %s.', non_tex_file)
-      _copy_file(non_tex_file, parameters)
+      output_filename = _copy_file(non_tex_file, parameters)
+      if output_filename != non_tex_file:
+        non_tex_filename_changes[non_tex_file] = output_filename
 
-    filename_changes = _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
+    # Collect filename changes from figures (for flattening and PNG->JPG conversion)
+    figure_filename_changes = _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
+
+    # Merge all filename changes
+    filename_changes = {**non_tex_filename_changes, **figure_filename_changes}
+
     logging.info('Outputs written to %s', parameters['output_folder'])
 
     # Update LaTeX references for changed filenames if tex_contents_dict is provided
@@ -1027,7 +1056,8 @@ def run_arxiv_cleaner(parameters):
                     updated_content = tex_contents[tex_file]
                 
                 # Write the updated content back to the output file
-                output_path = os.path.join(parameters['output_folder'], tex_file)
+                out_file = _flatten_filename(tex_file) if parameters.get('flatten_files', False) else tex_file
+                output_path = os.path.join(parameters['output_folder'], out_file)
                 logging.info('Re-writing modified tex file with updated references: %s', output_path)
                 _write_file_content(updated_content, output_path)
                 
@@ -1065,6 +1095,50 @@ def merge_args_into_config(args, config_params):
     else:
       final_args[key] = value
   return final_args
+
+
+def _flatten_filename(filename):
+  """Convert a nested path to a flat filename by replacing '/' with '_'.
+
+  Examples:
+    'sections/intro.tex' -> 'sections_intro.tex'
+    'chapters/sec1/intro.tex' -> 'chapters_sec1_intro.tex'
+    'main.tex' -> 'main.tex' (no change for root files)
+  """
+  normalized = filename.replace('\\', '/')
+  while normalized.startswith('./'):
+    normalized = normalized[2:]
+  parts = normalized.split('/')
+  if len(parts) == 1:
+    return normalized  # Already in root, no change
+  return '_'.join(parts)
+
+
+def _flatten_input_paths(content):
+  r"""Rewrite \input{a/b} -> \input{a_b}, \include{a/b} -> \include{a_b},
+  \lstinputlisting{a/b} -> \lstinputlisting{a_b}, and \includegraphics{a/b} -> \includegraphics{a_b}.
+
+  This converts paths with subdirectories to flat paths using underscores
+  as separators. For example:
+    \input{sections/intro} -> \input{sections_intro}
+    \include{chapters/ch1/sec2} -> \include{chapters_ch1_sec2}
+    \lstinputlisting{code/script.py} -> \lstinputlisting{code_script.py}
+    \includegraphics{figures/plot.png} -> \includegraphics{figures_plot.png}
+  """
+  def replace_path(m):
+    cmd = m.group(1)  # e.g., '\input{', '\include{', '\lstinputlisting{', '\includegraphics{'
+    path = m.group(2)  # e.g., 'sections/intro' or 'sections/intro.tex'
+    normalized = path.replace('\\', '/')
+    while normalized.startswith('./'):
+      normalized = normalized[2:]
+    flat_path = normalized.replace('/', '_')
+    return cmd + flat_path + m.group(3)
+
+  return regex.sub(
+      r'(\\(?:input|include|lstinputlisting|includegraphics)\{)([^}]+)(\})',
+      replace_path,
+      content
+  )
 
 
 def _find_and_replace_patterns(content, patterns_and_insertions):

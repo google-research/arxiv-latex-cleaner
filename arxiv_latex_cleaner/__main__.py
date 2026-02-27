@@ -222,6 +222,16 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--flatten_files",
+    action="store_true",
+    help=(
+        "Flatten the subdirectory structure for tex files: "
+        "\\input{sections/intro} becomes \\input{sections_intro} "
+        "and the file is moved from sections/intro.tex to sections_intro.tex."
+    ),
+)
+
+PARSER.add_argument(
     "--verbose",
     action="store_true",
     help="Enable detailed output.",
