@@ -8,6 +8,8 @@ jobs:
   build:
     name: Create a GitHub Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
