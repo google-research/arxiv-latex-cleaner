@@ -480,7 +480,7 @@ def _replace_tikzpictures(content, figures):
       return matchobj.group(0)
 
   content = regex.sub(
-      r'\\tikzsetnextfilename{[\s\S]*?\\end{tikzpicture}', get_figure, content
+      r'\\tikzsetnextfilename{[\s\S]*?(:?\\end{tikzpicture}|\\input{\S*?})', get_figure, content
   )
 
   return content
