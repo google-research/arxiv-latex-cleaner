@@ -29,7 +29,7 @@ from .arxiv_latex_cleaner import merge_args_into_config
 from .arxiv_latex_cleaner import run_arxiv_cleaner
 
 PARSER = argparse.ArgumentParser(
-    prog="arxiv_latex_cleaner@{0}".format(__version__),
+    prog="arxiv_latex_cleaner",
     description=(
         "Clean the LaTeX code of your paper to submit to arXiv. "
         "Check the README for more information on the use."
