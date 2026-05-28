@@ -176,6 +176,7 @@ def _remove_environment(text, environment):
       text,
   )
 
+custom_if = {'true' : [], 'false' : []}
 
 def _simplify_conditional_blocks(text, if_exceptions=[]):
   r"""Simplify possibly nested conditional blocks from 'text'.
@@ -187,6 +188,8 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
   If the conditional tree is malformed, the function will print a warning
   to stderr and return the original text.
   """
+  custom_if_pattern = regex.compile(r'\\newif\\if([^\\]*)\\\1(true|false)')
+
   p = regex.compile(r'(?!(?<=\\newif\s*))\\if\s*(\w+)|\\else(?!\w)|\\fi(?!\w)')
   toplevel_tree = {'left': [], 'right': [], 'kind': 'toplevel', 'parent': None}
 
@@ -287,14 +290,17 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
         f" --if_exceptions'.\n"
     )
 
+  for m in custom_if_pattern.finditer(text):
+    custom_if[m.group(2)].append(r'\if' + m.group(1))
+
   for m in p.finditer(text):
     m_no_space = m.group().replace(' ', '')
-    if m_no_space == r'\iffalse' or m_no_space == r'\if0':
+    if m_no_space == r'\iffalse' or m_no_space == r'\if0' or m_no_space in custom_if['false']:
       subtree = new_subtree('iffalse')
       subtree['start'] = m
       add_subtree(tree, subtree)
       tree = subtree
-    elif m_no_space == r'\iftrue' or m_no_space == r'\if1':
+    elif m_no_space == r'\iftrue' or m_no_space == r'\if1' or m_no_space in custom_if['true']:
       subtree = new_subtree('iftrue')
       subtree['start'] = m
       add_subtree(tree, subtree)
