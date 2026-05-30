@@ -415,6 +415,42 @@ class UnitTests(parameterized.TestCase):
 
   @parameterized.named_parameters(
       {
+          # '.' would match any character if not escaped, so the similarly
+          # named '\todoX' command would be wrongly removed as well.
+          'testcase_name': 'dot',
+          'command': 'todo.',
+          'kept_command': '\\todoX{B}',
+          'removed_command': '\\todo.{C}',
+      },
+      {
+          # '*' is a quantifier; unescaped, the pattern would not match the
+          # literal command '\star*' at all.
+          'testcase_name': 'star',
+          'command': 'star*',
+          'kept_command': '\\start{B}',
+          'removed_command': '\\star*{C}',
+      },
+      {
+          # '+' is a quantifier; unescaped it changes which text matches.
+          'testcase_name': 'plus',
+          'command': 'foo+',
+          'kept_command': '\\foobar{B}',
+          'removed_command': '\\foo+{C}',
+      },
+  )
+  def test_remove_command_escapes_regex_metacharacters_in_name(
+      self, command, kept_command, removed_command
+  ):
+    # A command name with regex metacharacters must be matched literally. The
+    # similarly named command without the metacharacter must be left untouched,
+    # and the targeted command must be removed.
+    text = 'A ' + kept_command + ' B ' + removed_command + ' C\n'
+    output = arxiv_latex_cleaner._remove_command(text, command, False)
+    self.assertIn(kept_command, output)
+    self.assertNotIn(removed_command, output)
+
+  @parameterized.named_parameters(
+      {
           'testcase_name': 'no_environment',
           'text_in': 'Foo\n',
           'true_output': 'Foo\n',
