@@ -112,7 +112,7 @@ def _remove_command(text, command, keep_text=False):
   """
   base_pattern = (
       r'\\'
-      + command
+      + regex.escape(command)
       + r'(?:\[(?:.*?)\])*\{((?:[^{}]+|\{(?1)\})*)\}(?:\[(?:.*?)\])*'
   )
 
