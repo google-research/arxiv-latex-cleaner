@@ -385,11 +385,15 @@ def _remove_comments_inline(text):
     """Check if a segment of text contains a comment and remove it."""
     if segment.lstrip().startswith('%'):
       return '', True
-    match = regex.search(r'(?<!\\)%', segment)
-    if match:
-      return segment[: match.end()] + '\n', True
-    else:
-      return segment, False
+    # Do not match \% (as this is the escaped percent symbol),
+    # but do match `\\%` (break line + start of comment).
+    for match in regex.finditer(r'\\*%', segment):
+      # If there are an odd number of backslashes, the percent char is escaped,
+      # otherwise the percent char is the beginning of a comment.
+      if (len(match[0]) - 1) % 2 == 0:
+        return segment[: match.end()] + '\n', True
+    
+    return segment, False
 
   # split the text into segments based on \url{} tags
   segments = regex.split(f'({url_pattern})', text)
@@ -455,7 +459,7 @@ def _remove_comments_and_commands_to_delete(content, parameters):
     content = _remove_environment(content, environment)
   for command in parameters.get('commands_only_to_delete', []):
     content = _remove_command(content, command, True)
-  for command in parameters['commands_to_delete']:
+  for command in parameters.get('commands_to_delete', []):
     content = _remove_command(content, command, False)
   return content
 
