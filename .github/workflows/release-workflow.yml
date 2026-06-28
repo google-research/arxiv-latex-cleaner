@@ -12,10 +12,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -29,9 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@e9aba2c848f5ebd159c070c61ea2c4e2b122355e # v2
         with:
           python-version: '3.x'
       - name: Install dependencies
