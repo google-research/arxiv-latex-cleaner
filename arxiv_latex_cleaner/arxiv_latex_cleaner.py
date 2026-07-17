@@ -798,27 +798,137 @@ def _keep_only_referenced(filenames, contents, strict=False):
   ]
 
 
-def _keep_only_referenced_tex(contents, splits):
+def _keep_only_referenced_prefer_shallow(filenames, contents):
+  """Returns references while resolving duplicate basenames like TeX does.
+
+  A reference without a directory may weakly match the same filename in
+  several folders. In main-file mode, prefer the shallowest match rather than
+  copying every duplicate. An explicitly qualified reference still matches
+  only its corresponding path.
+  """
+  matches = _keep_only_referenced(filenames, contents, strict=False)
+  shallowest = {}
+  matches = sorted(matches, key=lambda item: (item.count(os.sep), item))
+  for filename in matches:
+    basename = pathlib.PurePosixPath(filename).name
+    shallowest.setdefault(basename, filename)
+  return list(shallowest.values())
+
+
+def _keep_only_referenced_tex(contents, splits, main_tex_files=None):
   """Returns the filenames referenced from the tex files themselves.
 
   It needs various iterations in case one file is referenced from an
   unreferenced file.
+
+  If ``main_tex_files`` is provided, only files reachable from those entry
+  points are retained. Otherwise every TeX file in the input root remains an
+  entry point for backwards compatibility.
   """
-  old_referenced = set(splits['tex_in_root'] + splits['tex_not_in_root'])
+  if main_tex_files is None:
+    old_referenced = set(splits['tex_in_root'] + splits['tex_not_in_root'])
+    while True:
+      referenced = set(splits['tex_in_root'])
+      for fn in old_referenced:
+        for fn2 in old_referenced:
+          if regex.search(
+              r'(' + os.path.splitext(fn)[0] + r'[.}])',
+              '\n'.join(contents[fn2]),
+          ):
+            referenced.add(fn)
+
+      if referenced == old_referenced:
+        splits['tex_to_copy'] = list(referenced)
+        return
+
+      old_referenced = referenced.copy()
+
+  tex_files = set(splits['tex_in_root'] + splits['tex_not_in_root'])
+  referenced = set(main_tex_files)
   while True:
-    referenced = set(splits['tex_in_root'])
-    for fn in old_referenced:
-      for fn2 in old_referenced:
-        if regex.search(
-            r'(' + os.path.splitext(fn)[0] + r'[.}])', '\n'.join(contents[fn2])
-        ):
-          referenced.add(fn)
+    old_referenced = referenced.copy()
+    full_content = '\n'.join(
+        ''.join(contents[fn]) for fn in referenced
+    )
+    candidates = tex_files - referenced
+    referenced.update(
+        _keep_only_referenced_prefer_shallow(candidates, full_content)
+    )
 
     if referenced == old_referenced:
-      splits['tex_to_copy'] = list(referenced)
+      splits['tex_to_copy'] = sorted(referenced)
       return
 
-    old_referenced = referenced.copy()
+
+def _normalize_main_tex(main_tex, splits):
+  """Validates and normalizes a main TeX path relative to the input folder."""
+  if main_tex is None:
+    return None
+
+  main_tex = str(pathlib.PurePosixPath(main_tex.replace('\\', '/')))
+  main_path = pathlib.PurePosixPath(main_tex)
+  if main_path.is_absolute() or '..' in main_path.parts:
+    raise ValueError('--main_tex must be a path inside the input folder.')
+  if main_path.suffix.lower() != '.tex':
+    raise ValueError('--main_tex must point to a .tex file.')
+
+  tex_files = set(splits['tex_in_root'] + splits['tex_not_in_root'])
+  if main_tex not in tex_files:
+    raise ValueError(
+        '--main_tex file {!r} was not found in the input folder.'.format(
+            main_tex
+        )
+    )
+  return main_tex
+
+
+def _copy_referenced_non_tex(parameters, contents, splits, main_tex=None):
+  """Copies non-TeX dependencies, optionally omitting unreferenced root files."""
+  if main_tex is None:
+    _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits)
+    for non_tex_file in splits['non_tex_in_root']:
+      logging.info('Copying non-tex file %s.', non_tex_file)
+      _copy_file(non_tex_file, parameters)
+    return
+
+  candidates = splits['non_tex_in_root'] + splits['non_tex_not_in_root']
+
+  # Most non-TeX files should appear with their full filename in the source.
+  # TeX commonly omits extensions only for document classes, packages, and
+  # bibliography-related files, so limit weak matching to those types. This
+  # prevents a reference such as ``{main}`` from retaining an unrelated
+  # ``main.txt`` or ``main.zip`` file.
+  referenced = set(_keep_only_referenced(candidates, contents, strict=True))
+  implicit_extension_files = _keep_pattern(
+      candidates,
+      [
+          r'\.cls$',
+          r'\.sty$',
+          r'\.bst$',
+          r'\.bib$',
+          r'\.bbx$',
+          r'\.cbx$',
+          r'\.lbx$',
+          r'\.clo$',
+          r'\.cfg$',
+          r'\.def$',
+      ],
+  )
+  referenced.update(
+      _keep_only_referenced_prefer_shallow(
+          implicit_extension_files, contents
+      )
+  )
+
+  # LaTeX reads a pre-built bibliography with the main file's basename even
+  # though the .bbl filename does not appear explicitly in the source.
+  main_bbl = os.path.splitext(main_tex)[0] + '.bbl'
+  if main_bbl in candidates:
+    referenced.add(main_bbl)
+
+  for non_tex_file in sorted(referenced):
+    logging.info('Copying referenced non-tex file %s.', non_tex_file)
+    _copy_file(non_tex_file, parameters)
 
 
 def _add_root_tex_files(splits):
@@ -954,6 +1064,7 @@ def run_arxiv_cleaner(parameters):
       parameters['input_folder'] = tempdir
 
     splits = _split_all_files(parameters)
+    main_tex = _normalize_main_tex(parameters.get('main_tex'), splits)
 
     logging.info('Reading all tex files')
     tex_contents = _read_all_tex_contents(
@@ -981,8 +1092,11 @@ def run_arxiv_cleaner(parameters):
       # '\n', so we remove it.
       tex_contents[tex_file] = content.split('\n')
 
-    _keep_only_referenced_tex(tex_contents, splits)
-    _add_root_tex_files(splits)
+    _keep_only_referenced_tex(
+        tex_contents, splits, [main_tex] if main_tex is not None else None
+    )
+    if main_tex is None:
+      _add_root_tex_files(splits)
 
     for tex_file in splits['tex_to_copy']:
       logging.info('Replacing patterns in file %s.', tex_file)
@@ -1001,10 +1115,7 @@ def run_arxiv_cleaner(parameters):
     full_content = '\n'.join(
         ''.join(tex_contents[fn]) for fn in splits['tex_to_copy']
     )
-    _copy_only_referenced_non_tex_not_in_root(parameters, full_content, splits)
-    for non_tex_file in splits['non_tex_in_root']:
-      logging.info('Copying non-tex file %s.', non_tex_file)
-      _copy_file(non_tex_file, parameters)
+    _copy_referenced_non_tex(parameters, full_content, splits, main_tex)
 
     filename_changes = _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
     logging.info('Outputs written to %s', parameters['output_folder'])
