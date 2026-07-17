@@ -60,7 +60,8 @@ python setup.py install
 *   Removes all auxiliary files (`.aux`, `.log`, `.out`, etc.).
 *   Removes all comments from your code (yes, those are visible on arXiv and you
     do not want them to be). These also include `\begin{comment}\end{comment}`,
-    `\iffalse\fi`, and `\if0\fi` environments.
+    `\iffalse\fi`, and `\if0\fi` environments. Comments in retained `.bib`
+    and `.bbl` files are removed as well.
 *   Optionally removes user-defined commands entered with `commands_to_delete`
     (such as `\todo{}` that you redefine as the empty string at the end).
 *   Optionally allows you to define custom regex replacement rules through a

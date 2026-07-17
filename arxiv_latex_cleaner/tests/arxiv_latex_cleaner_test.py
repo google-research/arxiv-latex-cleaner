@@ -1034,8 +1034,14 @@ class IntegrationTests(parameterized.TestCase):
           'sections/body.tex': '\\lstinputlisting{data/used.txt}\n',
           'paper.cls': '% local document class\n',
           'refs.bst': '% local bibliography style\n',
-          'sources.bib': '@misc{example, title={Example}}\n',
-          'main.bbl': '\\begin{thebibliography}{1}\\end{thebibliography}\n',
+          'sources.bib': (
+              '% private bibliography note\n'
+              '@misc{example, title={Example 51\\% Result}}\n'
+          ),
+          'main.bbl': (
+              '% private generated note\n'
+              '\\begin{thebibliography}{1}\\end{thebibliography}\n'
+          ),
           'data/used.txt': 'referenced data\n',
           'alternate.tex': '\\documentclass{alternate}\n',
           'alternate.cls': '% unrelated document class\n',
@@ -1081,6 +1087,17 @@ class IntegrationTests(parameterized.TestCase):
               'main.bbl',
               'data/used.txt',
           },
+      )
+      bibliography_contents = {}
+      for bibliography_file in ['sources.bib', 'main.bbl']:
+        with open(
+            path.join(input_dir + '_arXiv', bibliography_file),
+            encoding='utf-8',
+        ) as file_obj:
+          bibliography_contents[bibliography_file] = file_obj.read()
+        self.assertNotIn('private', bibliography_contents[bibliography_file])
+      self.assertIn(
+          r'51\% Result', bibliography_contents['sources.bib']
       )
 
   def tearDown(self):

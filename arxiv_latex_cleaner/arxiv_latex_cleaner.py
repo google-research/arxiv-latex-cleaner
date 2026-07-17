@@ -104,6 +104,21 @@ def _copy_file(filename, params):
   )
 
 
+def _copy_file_cleaning_comments(filename, params):
+  """Copies a file, removing private comments from bibliography sources."""
+  if os.path.splitext(filename)[1].lower() not in ['.bib', '.bbl']:
+    _copy_file(filename, params)
+    return
+
+  content = _read_file_content(
+      os.path.join(params['input_folder'], filename)
+  )
+  content = ''.join(_remove_comments_inline(line) for line in content)
+  _write_file_content(
+      content, os.path.join(params['output_folder'], filename)
+  )
+
+
 def _remove_command(text, command, keep_text=False):
   """Removes '\\command{*}' from the string 'text'.
 
@@ -705,7 +720,7 @@ def _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits):
   for fn in _keep_only_referenced(
       splits['non_tex_not_in_root'], contents, strict=True
   ):
-    _copy_file(fn, parameters)
+    _copy_file_cleaning_comments(fn, parameters)
 
 def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
     """Modified to handle PNG to JPG conversion and reference updates."""
@@ -888,7 +903,7 @@ def _copy_referenced_non_tex(parameters, contents, splits, main_tex=None):
     _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits)
     for non_tex_file in splits['non_tex_in_root']:
       logging.info('Copying non-tex file %s.', non_tex_file)
-      _copy_file(non_tex_file, parameters)
+      _copy_file_cleaning_comments(non_tex_file, parameters)
     return
 
   candidates = splits['non_tex_in_root'] + splits['non_tex_not_in_root']
@@ -928,7 +943,7 @@ def _copy_referenced_non_tex(parameters, contents, splits, main_tex=None):
 
   for non_tex_file in sorted(referenced):
     logging.info('Copying referenced non-tex file %s.', non_tex_file)
-    _copy_file(non_tex_file, parameters)
+    _copy_file_cleaning_comments(non_tex_file, parameters)
 
 
 def _add_root_tex_files(splits):
