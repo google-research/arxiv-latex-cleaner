@@ -735,9 +735,16 @@ def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
     
     filename_changes = {}  # Track PNG -> JPG filename changes
     
-    for image_file in _keep_only_referenced(
-        splits['figures'], contents, strict=False
-    ):
+    if parameters.get('main_tex') is None:
+        referenced_figures = _keep_only_referenced(
+            splits['figures'], contents, strict=False
+        )
+    else:
+        referenced_figures = _keep_only_referenced_prefer_shallow(
+            splits['figures'], contents
+        )
+
+    for image_file in referenced_figures:
         actual_output_filename = _resize_and_copy_figure(
             filename=image_file,
             origin_folder=parameters['input_folder'],

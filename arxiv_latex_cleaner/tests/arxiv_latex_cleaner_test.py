@@ -1028,6 +1028,7 @@ class IntegrationTests(parameterized.TestCase):
           'main.tex': (
               '\\documentclass{paper}\n'
               '\\input{sections/body}\n'
+              '\\includegraphics{plot}\n'
               '\\bibliographystyle{refs}\n'
               '\\bibliography{sources}\n'
           ),
@@ -1046,6 +1047,8 @@ class IntegrationTests(parameterized.TestCase):
           'alternate.tex': '\\documentclass{alternate}\n',
           'alternate.cls': '% unrelated document class\n',
           'vendor/paper.cls': '% shadowed duplicate document class\n',
+          'plot.pdf': 'referenced figure\n',
+          'vendor/plot.pdf': 'shadowed duplicate figure\n',
           'sections/unused.tex': 'unreferenced section\n',
           'review.txt': 'private review notes\n',
           'source.zip': 'unrelated archive\n',
@@ -1086,6 +1089,7 @@ class IntegrationTests(parameterized.TestCase):
               'sources.bib',
               'main.bbl',
               'data/used.txt',
+              'plot.pdf',
           },
       )
       bibliography_contents = {}
