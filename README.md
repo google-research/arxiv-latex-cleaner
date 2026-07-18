@@ -11,6 +11,13 @@ arXiv.
 arxiv_latex_cleaner /path/to/latex --resize_images --im_size 500 --images_allowlist='{"images/im.png":2000}'
 ```
 
+If the folder contains multiple papers or private root-level files, select the
+entry point explicitly:
+
+```bash
+arxiv_latex_cleaner /path/to/latex --main_tex main.tex
+```
+
 Or simply from a config file
 
 ```bash
@@ -53,7 +60,8 @@ python setup.py install
 *   Removes all auxiliary files (`.aux`, `.log`, `.out`, etc.).
 *   Removes all comments from your code (yes, those are visible on arXiv and you
     do not want them to be). These also include `\begin{comment}\end{comment}`,
-    `\iffalse\fi`, and `\if0\fi` environments.
+    `\iffalse\fi`, and `\if0\fi` environments. Comments in retained `.bib`
+    and `.bbl` files are removed as well.
 *   Optionally removes user-defined commands entered with `commands_to_delete`
     (such as `\todo{}` that you redefine as the empty string at the end).
 *   Optionally allows you to define custom regex replacement rules through a
@@ -65,6 +73,8 @@ There is a 50MB limit on arXiv submissions, so to make it fit:
 
 *   Removes all unused `.tex` files (those that are not in the root and not
     included in any other `.tex` file).
+*   With `--main_tex`, copies only the selected paper and its referenced
+    dependencies, omitting unrelated root-level files as well.
 *   Removes all unused images that take up space (those that are not actually
     included in any used `.tex` file).
 *   Optionally resizes all images to `im_size` pixels, to reduce the size of the
@@ -122,6 +132,7 @@ patterns.
 
 ```
 usage: arxiv_latex_cleaner@v1.0.11 [-h] [--resize_images] [--im_size IM_SIZE]
+                                   [--main_tex MAIN_TEX]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
                                    [--images_allowlist IMAGES_ALLOWLIST]
@@ -146,6 +157,9 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
+  --main_tex MAIN_TEX   Main TeX file, relative to the input folder. When set,
+                        only this file and its referenced dependencies are
+                        copied; unrelated root files are omitted.
   --resize_images       Resize images.
   --im_size IM_SIZE     Size of the output images (in pixels, longest side).
                         Fine tune this to get as close to 10MB as possible.

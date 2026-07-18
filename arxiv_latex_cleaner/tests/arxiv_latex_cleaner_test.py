@@ -13,8 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from os import path
 import shutil
+import tempfile
 import unittest
 from absl.testing import parameterized
 from arxiv_latex_cleaner import arxiv_latex_cleaner
@@ -226,6 +228,26 @@ def make_search_reference_tests():
 
 
 class UnitTests(parameterized.TestCase):
+
+  def test_normalize_main_tex(self):
+    splits = {
+        'tex_in_root': ['main.tex'],
+        'tex_not_in_root': ['sections/body.tex'],
+    }
+    self.assertEqual(
+        arxiv_latex_cleaner._normalize_main_tex('./main.tex', splits),
+        'main.tex',
+    )
+    self.assertEqual(
+        arxiv_latex_cleaner._normalize_main_tex(
+            r'sections\body.tex', splits
+        ),
+        'sections/body.tex',
+    )
+    for invalid in ['../main.tex', '/tmp/main.tex', 'missing.tex', 'main.tikz']:
+      with self.subTest(invalid=invalid):
+        with self.assertRaises(ValueError):
+          arxiv_latex_cleaner._normalize_main_tex(invalid, splits)
 
   @parameterized.named_parameters(
       {
@@ -995,8 +1017,96 @@ class IntegrationTests(parameterized.TestCase):
             path.join(self.out_path, f1), path.join(out_path_true, f1)
         )
 
+  def test_main_tex_omits_unreferenced_root_files(self):
+    with tempfile.TemporaryDirectory() as temp_dir:
+      input_dir = path.join(temp_dir, 'paper')
+      os.makedirs(path.join(input_dir, 'sections'))
+      os.makedirs(path.join(input_dir, 'data'))
+      os.makedirs(path.join(input_dir, 'vendor'))
+
+      files = {
+          'main.tex': (
+              '\\documentclass{paper}\n'
+              '\\input{sections/body}\n'
+              '\\includegraphics{plot}\n'
+              '\\bibliographystyle{refs}\n'
+              '\\bibliography{sources}\n'
+          ),
+          'sections/body.tex': '\\lstinputlisting{data/used.txt}\n',
+          'paper.cls': '% local document class\n',
+          'refs.bst': '% local bibliography style\n',
+          'sources.bib': (
+              '% private bibliography note\n'
+              '@misc{example, title={Example 51\\% Result}}\n'
+          ),
+          'main.bbl': (
+              '% private generated note\n'
+              '\\begin{thebibliography}{1}\\end{thebibliography}\n'
+          ),
+          'data/used.txt': 'referenced data\n',
+          'alternate.tex': '\\documentclass{alternate}\n',
+          'alternate.cls': '% unrelated document class\n',
+          'vendor/paper.cls': '% shadowed duplicate document class\n',
+          'plot.pdf': 'referenced figure\n',
+          'vendor/plot.pdf': 'shadowed duplicate figure\n',
+          'sections/unused.tex': 'unreferenced section\n',
+          'review.txt': 'private review notes\n',
+          'source.zip': 'unrelated archive\n',
+          'main.vtc': 'unrelated file sharing the main basename\n',
+      }
+      for filename, content in files.items():
+        with open(
+            path.join(input_dir, filename), 'w', encoding='utf-8'
+        ) as file_obj:
+          file_obj.write(content)
+
+      arxiv_latex_cleaner.run_arxiv_cleaner({
+          'input_folder': input_dir,
+          'main_tex': 'main.tex',
+          'images_allowlist': {},
+          'resize_images': False,
+          'im_size': 500,
+          'compress_pdf': False,
+          'pdf_im_resolution': 500,
+          'commands_to_delete': [],
+          'commands_only_to_delete': [],
+          'environments_to_delete': [],
+          'if_exceptions': [],
+          'use_external_tikz': None,
+          'keep_bib': True,
+      })
+
+      output_files = set(
+          arxiv_latex_cleaner._list_all_files(input_dir + '_arXiv')
+      )
+      self.assertSetEqual(
+          output_files,
+          {
+              'main.tex',
+              'sections/body.tex',
+              'paper.cls',
+              'refs.bst',
+              'sources.bib',
+              'main.bbl',
+              'data/used.txt',
+              'plot.pdf',
+          },
+      )
+      bibliography_contents = {}
+      for bibliography_file in ['sources.bib', 'main.bbl']:
+        with open(
+            path.join(input_dir + '_arXiv', bibliography_file),
+            encoding='utf-8',
+        ) as file_obj:
+          bibliography_contents[bibliography_file] = file_obj.read()
+        self.assertNotIn('private', bibliography_contents[bibliography_file])
+      self.assertIn(
+          r'51\% Result', bibliography_contents['sources.bib']
+      )
+
   def tearDown(self):
-    shutil.rmtree(self.out_path)
+    if path.isdir(self.out_path):
+      shutil.rmtree(self.out_path)
     super(IntegrationTests, self).tearDown()
 
 if __name__ == '__main__':

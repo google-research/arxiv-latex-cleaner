@@ -43,6 +43,16 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--main_tex",
+    type=str,
+    help=(
+        "Main TeX file, relative to the input folder. When set, only this "
+        "file and its referenced dependencies are copied; unrelated root "
+        "files are omitted."
+    ),
+)
+
+PARSER.add_argument(
     "--resize_images",
     action="store_true",
     help="Resize images.",
