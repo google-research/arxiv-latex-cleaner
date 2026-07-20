@@ -15,6 +15,7 @@
 
 from os import path
 import shutil
+import tempfile
 import unittest
 from absl.testing import parameterized
 from arxiv_latex_cleaner import arxiv_latex_cleaner
@@ -998,6 +999,85 @@ class IntegrationTests(parameterized.TestCase):
   def tearDown(self):
     shutil.rmtree(self.out_path)
     super(IntegrationTests, self).tearDown()
+
+
+class AgentFileTests(parameterized.TestCase):
+  """Checks that AI coding agent config files are stripped from the output."""
+
+  # A representative sample of files created by AI coding agents that should
+  # never leak into an arXiv source bundle.
+  AGENT_FILES = [
+      'CLAUDE.md',
+      'CLAUDE.local.md',
+      'AGENTS.md',
+      'AGENT.md',
+      'GEMINI.md',
+      'WARP.md',
+      '.cursorrules',
+      '.windsurfrules',
+      '.mcp.json',
+      '.claude/settings.json',
+      '.claude/commands/foo.md',
+      '.cursor/rules/style.mdc',
+      '.gemini/settings.json',
+      '.codex/config.toml',
+      '.aider.chat.history.md',
+      '.github/copilot-instructions.md',
+  ]
+
+  def setUp(self):
+    super(AgentFileTests, self).setUp()
+    self.in_path = tempfile.mkdtemp()
+    self.out_path = self.in_path + '_arXiv'
+
+  def _populate_input(self):
+    # A minimal but valid paper that references nothing external.
+    with open(path.join(self.in_path, 'main.tex'), 'w') as f:
+      f.write('\\documentclass{article}\n\\begin{document}\nHi.\n'
+              '\\end{document}\n')
+    for rel_path in self.AGENT_FILES:
+      full_path = path.join(self.in_path, rel_path)
+      arxiv_latex_cleaner._create_dir_if_not_exists(path.dirname(full_path))
+      with open(full_path, 'w') as f:
+        f.write('agent instructions\n')
+
+  def _run(self, keep_agent_files):
+    arxiv_latex_cleaner.run_arxiv_cleaner({
+        'input_folder': self.in_path,
+        'images_allowlist': {},
+        'resize_images': False,
+        'im_size': 500,
+        'compress_pdf': False,
+        'pdf_im_resolution': 500,
+        'commands_to_delete': [],
+        'keep_bib': False,
+        'keep_agent_files': keep_agent_files,
+    })
+    return set(arxiv_latex_cleaner._list_all_files(self.out_path))
+
+  def test_agent_files_are_removed_by_default(self):
+    self._populate_input()
+    out_files = self._run(keep_agent_files=False)
+    self.assertIn('main.tex', out_files)
+    for rel_path in self.AGENT_FILES:
+      self.assertNotIn(
+          rel_path,
+          out_files,
+          '{:s} should have been removed.'.format(rel_path),
+      )
+
+  def test_agent_files_are_kept_with_flag(self):
+    self._populate_input()
+    out_files = self._run(keep_agent_files=True)
+    # Root-level files are always copied; with the opt-out they must survive.
+    self.assertIn('CLAUDE.md', out_files)
+    self.assertIn('AGENTS.md', out_files)
+
+  def tearDown(self):
+    shutil.rmtree(self.in_path, ignore_errors=True)
+    shutil.rmtree(self.out_path, ignore_errors=True)
+    super(AgentFileTests, self).tearDown()
+
 
 if __name__ == '__main__':
   unittest.main()

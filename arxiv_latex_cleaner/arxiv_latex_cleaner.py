@@ -34,6 +34,84 @@ PDF_RESIZE_COMMAND = (
 )
 MAX_FILENAME_LENGTH = 120
 
+# Files and directories written by AI coding agents/assistants (Claude Code,
+# OpenAI Codex, GitHub Copilot, Cursor, Gemini CLI, and others). They hold
+# instructions, memory, rules, and local tool config that should never end up
+# in an arXiv source bundle. Patterns are matched against POSIX-style relative
+# paths, so they cover both the project root and any subdirectory. Only tool-
+# specific names are included; generic names a human might legitimately use
+# (e.g. CONVENTIONS.md, memory-bank/) are deliberately left out to avoid
+# deleting real paper sources.
+AGENT_FILES_TO_DELETE = [
+    # Cross-tool standard instruction files (AGENTS.md / AGENT.md).
+    r'(?:^|/)AGENTS?\.md$',
+    r'(?:^|/)AGENTS\.override\.md$',
+    # Anthropic Claude / Claude Code.
+    r'(?:^|/)CLAUDE\.md$',
+    r'(?:^|/)CLAUDE\.local\.md$',
+    r'(?:^|/)\.claude/',
+    r'(?:^|/)\.mcp\.json$',
+    # OpenAI Codex.
+    r'(?:^|/)\.codex/',
+    # GitHub Copilot.
+    r'(?:^|/)\.github/copilot-instructions\.md$',
+    r'(?:^|/)\.github/instructions/',
+    r'(?:^|/)\.github/prompts/',
+    r'(?:^|/)\.github/chatmodes/',
+    # Cursor.
+    r'(?:^|/)\.cursorrules$',
+    r'(?:^|/)\.cursor/',
+    r'(?:^|/)\.cursorignore$',
+    r'(?:^|/)\.cursorindexingignore$',
+    # Windsurf / Codeium / Devin.
+    r'(?:^|/)\.windsurfrules$',
+    r'(?:^|/)\.windsurf/',
+    r'(?:^|/)\.devin/',
+    r'(?:^|/)\.codeiumignore$',
+    # Google Gemini CLI / Code Assist.
+    r'(?:^|/)GEMINI\.md$',
+    r'(?:^|/)\.gemini/',
+    r'(?:^|/)\.aiexclude$',
+    # Continue.dev.
+    r'(?:^|/)\.continue/',
+    r'(?:^|/)\.continuerules$',
+    # Cline.
+    r'(?:^|/)\.clinerules(?:$|/)',
+    r'(?:^|/)\.clineignore$',
+    # Roo Code.
+    r'(?:^|/)\.roo/',
+    r'(?:^|/)\.roorules',
+    r'(?:^|/)\.rooignore$',
+    # Aider (config, history, and cache files all start with '.aider').
+    r'(?:^|/)\.aider',
+    # Zed.
+    r'(?:^|/)\.rules$',
+    # JetBrains AI Assistant / Junie.
+    r'(?:^|/)\.aiassistant/',
+    r'(?:^|/)\.junie/',
+    r'(?:^|/)\.aiignore$',
+    r'(?:^|/)\.noai$',
+    # Amazon Q Developer / Kiro.
+    r'(?:^|/)\.amazonq/',
+    r'(?:^|/)\.kiro/',
+    # Augment Code.
+    r'(?:^|/)\.augment/',
+    r'(?:^|/)\.augment-guidelines$',
+    # OpenHands.
+    r'(?:^|/)\.openhands/',
+    r'(?:^|/)\.openhands_instructions$',
+    # Sourcegraph Cody.
+    r'(?:^|/)\.sourcegraph/',
+    r'(?:^|/)\.cody/',
+    # Trae, Qodo, Goose, Warp, Tabnine.
+    r'(?:^|/)\.trae/',
+    r'(?:^|/)\.qodo/',
+    r'(?:^|/)\.goose/',
+    r'(?:^|/)\.goosehints$',
+    r'(?:^|/)WARP\.md$',
+    r'(?:^|/)\.tabnine/',
+]
+
 # Fix for Windows: Even if '\' (os.sep) is the standard way of making paths on
 # Windows, it interferes with regular expressions. We just change os.sep to '/'
 # and os.path.join to a version using '/' as Windows will handle it the right
@@ -927,6 +1005,9 @@ def run_arxiv_cleaner(parameters):
 
   if not parameters['keep_bib']:
     files_to_delete.append(r'\.bib$')
+
+  if not parameters.get('keep_agent_files', False):
+    files_to_delete += AGENT_FILES_TO_DELETE
 
   parameters.update({
       'to_delete': files_to_delete,

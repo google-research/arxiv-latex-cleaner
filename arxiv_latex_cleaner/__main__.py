@@ -90,6 +90,17 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--keep_agent_files",
+    action="store_true",
+    help=(
+        "Avoid deleting AI coding agent config/instruction files (e.g. "
+        "CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/, .github/copilot-"
+        "instructions.md). By default these are removed so they do not leak "
+        "into the arXiv source."
+    ),
+)
+
+PARSER.add_argument(
     "--commands_to_delete",
     nargs="+",
     default=[],
