@@ -72,6 +72,10 @@ python setup.py install
 #### Privacy-oriented
 
 *   Removes all auxiliary files (`.aux`, `.log`, `.out`, etc.).
+*   Removes AI coding agent config/instruction files so they do not leak into
+    the arXiv source (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`,
+    `.windsurfrules`, `.claude/`, `.cursor/`, `.github/copilot-instructions.md`,
+    and many others). Pass `--keep_agent_files` to keep them.
 *   Removes all comments from your code (yes, those are visible on arXiv and you
     do not want them to be). These also include `\begin{comment}\end{comment}`,
     `\iffalse\fi`, and `\if0\fi` environments. A `%` inside `verbatim`,
@@ -162,7 +166,8 @@ usage: arxiv_latex_cleaner@v1.0.13 [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
                                    [--images_allowlist IMAGES_ALLOWLIST]
-                                   [--keep_bib] [--merge_tex_files]
+                                   [--keep_bib] [--keep_agent_files]
+                                   [--merge_tex_files]
                                    [--commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]]
                                    [--commands_only_to_delete COMMANDS_ONLY_TO_DELETE [COMMANDS_ONLY_TO_DELETE ...]]
                                    [--environments_to_delete ENVIRONMENTS_TO_DELETE [ENVIRONMENTS_TO_DELETE ...]]
@@ -199,6 +204,10 @@ optional arguments:
                         --pdf_im_resolution, respectively. Format is a
                         dictionary as: '{"path/to/im.jpg": 1000}'
   --keep_bib            Avoid deleting the *.bib files.
+  --keep_agent_files    Avoid deleting AI coding agent config/instruction
+                        files (e.g. CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/,
+                        .github/copilot-instructions.md). By default these are
+                        removed so they do not leak into the arXiv source.
   --merge_tex_files     Merge the TeX files into a single file, by
                         recursively replacing the \input and \include
                         commands in the root TeX files with the contents
