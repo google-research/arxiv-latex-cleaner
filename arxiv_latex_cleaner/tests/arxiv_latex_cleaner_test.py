@@ -677,6 +677,143 @@ class UnitTests(parameterized.TestCase):
         true_output,
     )
 
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'no_input',
+          'tex_contents': {'main.tex': 'Foo\nFoo2\n'},
+          'true_output': 'Foo\nFoo2\n',
+          'true_merged_files': set(),
+      },
+      {
+          'testcase_name': 'input_with_extension',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{section.tex}\nB\n',
+              'section.tex': 'C\nD\n',
+          },
+          'true_output': 'A\nC\nD\n\nB\n',
+          'true_merged_files': {'section.tex'},
+      },
+      {
+          'testcase_name': 'input_without_extension',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{section}\nB\n',
+              'section.tex': 'C\nD\n',
+          },
+          'true_output': 'A\nC\nD\n\nB\n',
+          'true_merged_files': {'section.tex'},
+      },
+      {
+          'testcase_name': 'input_tikz',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{figures/figure.tikz}\nB\n',
+              'figures/figure.tikz': 'C\n',
+          },
+          'true_output': 'A\nC\n\nB\n',
+          'true_merged_files': {'figures/figure.tikz'},
+      },
+      {
+          'testcase_name': 'input_path_starting_with_dot',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{./figures/section.tex}\nB\n',
+              'figures/section.tex': 'C\n',
+          },
+          'true_output': 'A\nC\n\nB\n',
+          'true_merged_files': {'figures/section.tex'},
+      },
+      {
+          'testcase_name': 'input_recursive',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{section.tex}\nB\n',
+              'section.tex': 'C\n\\input{subsection.tex}\nD\n',
+              'subsection.tex': 'E\n',
+          },
+          'true_output': 'A\nC\nE\n\nD\n\nB\n',
+          'true_merged_files': {'section.tex', 'subsection.tex'},
+      },
+      {
+          'testcase_name': 'input_twice',
+          'tex_contents': {
+              'main.tex': '\\input{table.tex}\n\\input{table.tex}\n',
+              'table.tex': 'C\n',
+          },
+          'true_output': 'C\n\nC\n\n',
+          'true_merged_files': {'table.tex'},
+      },
+      {
+          'testcase_name': 'input_with_comments',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{%\n  section.tex%\n}\nB\n',
+              'section.tex': 'C\n',
+          },
+          'true_output': 'A\nC\n\nB\n',
+          'true_merged_files': {'section.tex'},
+      },
+      {
+          'testcase_name': 'input_with_bom',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{section.tex}\nB\n',
+              'section.tex': '\ufeffC\n',
+          },
+          'true_output': 'A\nC\n\nB\n',
+          'true_merged_files': {'section.tex'},
+      },
+      {
+          'testcase_name': 'include',
+          'tex_contents': {
+              'main.tex': 'A\n\\include{chapter}\nB\n',
+              'chapter.tex': 'C\n',
+          },
+          'true_output': 'A\n\\clearpage{}\nC\n\\clearpage{}\n\nB\n',
+          'true_merged_files': {'chapter.tex'},
+      },
+      {
+          'testcase_name': 'include_recursive_input',
+          'tex_contents': {
+              'main.tex': 'A\n\\include{chapter}\nB\n',
+              'chapter.tex': 'C\n\\input{section.tex}\nD\n',
+              'section.tex': 'E\n',
+          },
+          'true_output': 'A\n\\clearpage{}\nC\nE\n\nD\n\\clearpage{}\n\nB\n',
+          'true_merged_files': {'chapter.tex', 'section.tex'},
+      },
+      {
+          'testcase_name': 'input_not_found_untouched',
+          'tex_contents': {'main.tex': 'A\n\\input{missing.tex}\nB\n'},
+          'true_output': 'A\n\\input{missing.tex}\nB\n',
+          'true_merged_files': set(),
+      },
+      {
+          'testcase_name': 'include_not_found_untouched',
+          'tex_contents': {'main.tex': 'A\n\\include{missing}\nB\n'},
+          'true_output': 'A\n\\include{missing}\nB\n',
+          'true_merged_files': set(),
+      },
+      {
+          'testcase_name': 'input_circular_untouched',
+          'tex_contents': {'main.tex': 'A\n\\input{main.tex}\nB\n'},
+          'true_output': 'A\n\\input{main.tex}\nB\n',
+          'true_merged_files': set(),
+      },
+      {
+          'testcase_name': 'includegraphics_untouched',
+          'tex_contents': {
+              'main.tex': 'A\n\\includegraphics{figures/figure.tikz}\nB\n',
+              'figures/figure.tikz': 'C\n',
+          },
+          'true_output': 'A\n\\includegraphics{figures/figure.tikz}\nB\n',
+          'true_merged_files': set(),
+      },
+  )
+  def test_merge_tex_files(self, tex_contents, true_output, true_merged_files):
+    merged_files = set()
+    self.assertEqual(
+        arxiv_latex_cleaner._merge_tex_files(
+            'main.tex', tex_contents, merged_files
+        ),
+        true_output,
+    )
+    self.assertSetEqual(merged_files, true_merged_files)
+
   @parameterized.named_parameters(*make_search_reference_tests())
   def test_search_reference_weak(
       self, filenames, contents, strict, true_outputs
@@ -994,6 +1131,70 @@ class IntegrationTests(parameterized.TestCase):
         self._compare_files(
             path.join(self.out_path, f1), path.join(out_path_true, f1)
         )
+
+  @parameterized.named_parameters(
+      {'testcase_name': 'from_dir', 'input_dir': 'test_data/tex'},
+      {'testcase_name': 'from_zip', 'input_dir': 'test_data/tex.zip'},
+  )
+  def test_merge_tex_files(self, input_dir):
+    out_path_true = 'test_data/tex_arXiv_true'
+    merged_files_true = [
+        'figures/figure_included.tex',
+        'figures/figure_included.tikz',
+    ]
+
+    # Make sure the folder does not exist, since we erase it in the test.
+    if path.isdir(self.out_path):
+      raise RuntimeError(
+          'The folder {:s} should not exist.'.format(self.out_path)
+      )
+
+    arxiv_latex_cleaner.run_arxiv_cleaner({
+        'input_folder': input_dir,
+        'images_allowlist': {
+            'images/im2_included.jpg': 200,
+            'images/im3_included.png': 400,
+        },
+        'resize_images': True,
+        'im_size': 100,
+        'compress_pdf': False,
+        'pdf_im_resolution': 500,
+        'commands_to_delete': ['mytodo'],
+        'commands_only_to_delete': ['red'],
+        'if_exceptions': ['iffalt'],
+        'environments_to_delete': ['mynote'],
+        'use_external_tikz': 'ext_tikz',
+        'keep_bib': False,
+        'merge_tex_files': True,
+    })
+
+    # Checks the merged files are not copied to the output folder, and that the
+    # set of files is otherwise the same as without merging.
+    out_files = set(arxiv_latex_cleaner._list_all_files(self.out_path))
+    out_files_true = set(
+        arxiv_latex_cleaner._list_all_files(out_path_true)
+    ) - set(merged_files_true)
+    self.assertSetEqual(out_files, out_files_true)
+
+    # Compares the contents of each file but the root file against the true
+    # value.
+    for f1 in out_files:
+      if f1 != 'main.tex':
+        self._compare_files(
+            path.join(self.out_path, f1), path.join(out_path_true, f1)
+        )
+
+    # Checks the root file contains the contents of the merged files, and no
+    # \input commands anymore.
+    with open(path.join(self.out_path, 'main.tex'), encoding='utf-8') as f:
+      main_content = f.read()
+    self.assertNotIn('\\input{', main_content)
+    self.assertNotIn('\\include{', main_content)
+    for merged_file in merged_files_true:
+      with open(path.join(out_path_true, merged_file), encoding='utf-8') as f:
+        # The BOM at the beginning of a file is stripped when it is merged.
+        merged_content_true = f.read().removeprefix('\ufeff')
+      self.assertIn(merged_content_true, main_content)
 
   def tearDown(self):
     shutil.rmtree(self.out_path)

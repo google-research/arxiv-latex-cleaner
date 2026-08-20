@@ -831,6 +831,52 @@ def _add_root_tex_files(splits):
       splits['tex_to_copy'].append(fn)
 
 
+def _merge_tex_files(filename, tex_contents, merged_files=None):
+  """Returns the contents of 'filename' with the referenced files merged in.
+
+  Replaces the '\\input{*}' and '\\include{*}' commands with the contents of
+  the files they reference, recursively; an '\\include{*}' command is
+  replaced together with the implicit '\\clearpage' before and after the file
+  contents, as in 'latexpand'. A command is only replaced if the referenced
+  file is a key of 'tex_contents'; the '.tex' extension may be omitted in the
+  command. Unknown and circular references are left untouched. The names of
+  the replaced files are added to the set 'merged_files'.
+  """
+  if merged_files is None:
+    merged_files = set()
+
+  def merge_file(filename, open_files):
+    def replace_reference(match):
+      input_filename = match.group(2)
+      if input_filename.startswith('.' + os.sep):
+        input_filename = input_filename[2:]
+      if input_filename not in tex_contents:
+        input_filename += '.tex'
+      if input_filename not in tex_contents or input_filename in open_files:
+        return match.group(0)
+      merged_files.add(input_filename)
+      merged_content = merge_file(
+          input_filename, open_files | {input_filename}
+      )
+      # Removes the BOM potentially present at the beginning of the merged
+      # file, as it is only valid there and would end up in the middle of the
+      # merged output.
+      merged_content = merged_content.removeprefix('\ufeff')
+      if match.group(1) == 'include':
+        # '\include' implies a '\clearpage' before and after the file
+        # contents.
+        merged_content = '\\clearpage{}\n' + merged_content + '\\clearpage{}\n'
+      return merged_content
+
+    return regex.sub(
+        r'\\(input|include)[\s%]*\{[\s%]*([^\s%}]+)[\s%]*\}',
+        replace_reference,
+        tex_contents[filename],
+    )
+
+  return merge_file(filename, {filename})
+
+
 def _split_all_files(parameters):
   """Splits the files into types or location to know what to do with them."""
   file_splits = {
@@ -983,6 +1029,18 @@ def run_arxiv_cleaner(parameters):
 
     _keep_only_referenced_tex(tex_contents, splits)
     _add_root_tex_files(splits)
+
+    if parameters.get('merge_tex_files', False):
+      full_contents = {fn: '\n'.join(tex_contents[fn]) for fn in tex_contents}
+      merged_files = set()
+      for tex_file in splits['tex_in_root']:
+        logging.info('Merging referenced TeX files into file %s.', tex_file)
+        tex_contents[tex_file] = _merge_tex_files(
+            tex_file, full_contents, merged_files
+        ).split('\n')
+      splits['tex_to_copy'] = [
+          fn for fn in splits['tex_to_copy'] if fn not in merged_files
+      ]
 
     for tex_file in splits['tex_to_copy']:
       logging.info('Replacing patterns in file %s.', tex_file)

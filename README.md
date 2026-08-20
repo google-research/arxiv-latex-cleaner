@@ -75,6 +75,20 @@ There is a 50MB limit on arXiv submissions, so to make it fit:
     `images_allowlist`.
 *   Optionally converts PNG images to JPG format to reduce file size.
 
+#### Merging the TeX files into a single file
+
+Sometimes it is useful to submit a single TeX file instead of the whole file
+structure, similar to [`latexpand`](https://ctan.org/pkg/latexpand). With
+`--merge_tex_files`, the tool:
+
+*   Recursively replaces the `\input{...}` and `\include{...}` commands in the
+    root `.tex` files with the contents of the files they reference, and does
+    not copy the merged files to the output folder.
+*   Replaces `\include{...}` together with its implicit `\clearpage` commands,
+    so that the compiled document stays the same.
+*   Applies all the other cleaning steps as usual to the merged output. Note
+    that `\includeonly` is not supported.
+
 #### TikZ picture source code concealment
 
 To prevent the upload of tikzpicture source code or raw simulation data, this
@@ -125,7 +139,7 @@ usage: arxiv_latex_cleaner@v1.0.11 [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
                                    [--images_allowlist IMAGES_ALLOWLIST]
-                                   [--keep_bib]
+                                   [--keep_bib] [--merge_tex_files]
                                    [--commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]]
                                    [--commands_only_to_delete COMMANDS_ONLY_TO_DELETE [COMMANDS_ONLY_TO_DELETE ...]]
                                    [--environments_to_delete ENVIRONMENTS_TO_DELETE [ENVIRONMENTS_TO_DELETE ...]]
@@ -161,6 +175,13 @@ optional arguments:
                         --pdf_im_resolution, respectively. Format is a
                         dictionary as: '{"path/to/im.jpg": 1000}'
   --keep_bib            Avoid deleting the *.bib files.
+  --merge_tex_files     Merge the TeX files into a single file, by
+                        recursively replacing the \input and \include
+                        commands in the root TeX files with the contents
+                        of the files they reference; \include is replaced
+                        together with its implicit \clearpage commands.
+                        The merged files are not copied to the output
+                        folder. Note that \includeonly is not supported.
   --commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]
                         LaTeX commands that will be deleted. Useful for e.g.
                         user-defined \todo commands. For example, to delete

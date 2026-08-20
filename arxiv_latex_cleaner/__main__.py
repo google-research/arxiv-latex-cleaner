@@ -90,6 +90,19 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--merge_tex_files",
+    action="store_true",
+    help=(
+        "Merge the TeX files into a single file, by recursively replacing "
+        "the \\input and \\include commands in the root TeX files with the "
+        "contents of the files they reference; \\include is replaced "
+        "together with its implicit \\clearpage commands. The merged files "
+        "are not copied to the output folder. Note that \\includeonly is "
+        "not supported."
+    ),
+)
+
+PARSER.add_argument(
     "--commands_to_delete",
     nargs="+",
     default=[],
