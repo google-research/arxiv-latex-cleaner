@@ -16,12 +16,15 @@
 import collections
 import contextlib
 import copy
+import dataclasses
+import enum
 import logging
 import os
 import pathlib
 import shutil
 import subprocess
 import tempfile
+from typing import List, Optional
 
 from PIL import Image
 import regex
@@ -187,10 +190,6 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
   If the conditional tree is malformed, the function will print a warning
   to stderr and return the original text.
   """
-  p = regex.compile(r'(?!(?<=\\newif\s*))\\if\s*(\w+)|\\else(?!\w)|\\fi(?!\w)')
-  toplevel_tree = {'left': [], 'right': [], 'kind': 'toplevel', 'parent': None}
-
-  tree = toplevel_tree
 
   exceptions = [
       # TeX primitives
@@ -251,123 +250,213 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
       'ifthenelse',
   ] + if_exceptions
 
-  def new_subtree(kind):
-    return {'kind': kind, 'left': [], 'right': []}
+  @dataclasses.dataclass
+  class TokenRange:
+    start: int
+    end: int
+    gobble_trailing_space: bool = True
 
-  def add_subtree(tree, subtree):
-    if 'else' not in tree:
-      tree['left'].append(subtree)
-    else:
-      tree['right'].append(subtree)
-    subtree['parent'] = tree
+    def extend_to(self, other: 'TokenRange') -> 'TokenRange':
+      assert self.end <= other.start
+      return TokenRange(self.start, other.end, other.gobble_trailing_space)
 
-  def print_tree(tree, indent, write):
-    if 'start' in tree:
-      write(' ' * indent + tree['start'].group() + '\n')
-    for subtree in tree['left']:
-      print_tree(subtree, indent + 2, write)
-    if 'else' in tree:
-      write(' ' * indent + tree['else'].group() + '\n')
-    for subtree in tree['right']:
-      print_tree(subtree, indent + 2)
-    if 'end' in tree:
-      write(' ' * indent + tree['end'].group() + '\n')
+  class NodeKind(enum.Enum):
+    TOPLEVEL = 'toplevel'
+    IFFALSE = 'iffalse'
+    IFTRUE = 'iftrue'
+    UNKNOWN = 'unknown'
 
-  def print_abort(error_finding):
-    os.sys.stderr.write(
-        f'Warning: Found {error_finding}! Not removing any conditional'
-        ' blocks...\n'
-    )
-    os.sys.stderr.write(
-        f'         This is the matched tree (as built up to the error):\n'
-    )
-    print_tree(toplevel_tree, indent=9, write=os.sys.stderr.write)
-    os.sys.stderr.write(
-        f'         Potentially, you need to supply an exception using'
-        f" --if_exceptions'.\n"
-    )
+  @dataclasses.dataclass
+  class ConditionNode:
+    kind: NodeKind
+    left: List['ConditionNode'] = dataclasses.field(default_factory=list)
+    right: List['ConditionNode'] = dataclasses.field(default_factory=list)
+    parent: Optional['ConditionNode'] = None
+    if_token: Optional[TokenRange] = None
+    else_token: Optional[TokenRange] = None
+    fi_token: Optional[TokenRange] = None
 
-  for m in p.finditer(text):
-    m_no_space = m.group().replace(' ', '')
-    if m_no_space == r'\iffalse' or m_no_space == r'\if0':
-      subtree = new_subtree('iffalse')
-      subtree['start'] = m
-      add_subtree(tree, subtree)
-      tree = subtree
-    elif m_no_space == r'\iftrue' or m_no_space == r'\if1':
-      subtree = new_subtree('iftrue')
-      subtree['start'] = m
-      add_subtree(tree, subtree)
-      tree = subtree
-    elif m_no_space.startswith(r'\if'):
-      if m_no_space[1:] in exceptions:
-        continue
-      subtree = new_subtree('unknown')
-      subtree['start'] = m
-      add_subtree(tree, subtree)
-      tree = subtree
-    elif m_no_space == r'\else':
-      if tree['parent'] is None:
-        print_abort(r'unmatched \else')
-        return text
-      elif 'else' in tree:
-        print_abort(r'duplicate \else')
-        return text
-
-      tree['else'] = m
-    elif m.group() == r'\fi':
-      if tree['parent'] is None:
-        print_abort(r'unmatched \fi')
-        return text
-
-      tree['end'] = m
-      tree = tree['parent']
-    else:
-      raise RuntimeError('Unreachable!')
-
-  if tree['parent'] is not None:
-    print_abort('unmatched ' + tree['start'].group())
-    return text
-
-  positions_to_delete = []
-
-  def traverse_tree(tree):
-    if tree['kind'] == 'iffalse':
-      if 'else' in tree:
-        positions_to_delete.append((tree['start'].start(), tree['else'].end()))
-        for subtree in tree['right']:
-          traverse_tree(subtree)
-        positions_to_delete.append((tree['end'].start(), tree['end'].end()))
+    def add_subtree(self, subtree: 'ConditionNode') -> None:
+      if self.else_token is None:
+        self.left.append(subtree)
       else:
-        positions_to_delete.append((tree['start'].start(), tree['end'].end()))
-    elif tree['kind'] == 'iftrue':
-      if 'else' in tree:
-        positions_to_delete.append((tree['start'].start(), tree['start'].end()))
-        for subtree in tree['left']:
-          traverse_tree(subtree)
-        positions_to_delete.append((tree['else'].start(), tree['end'].end()))
+        self.right.append(subtree)
+      subtree.parent = self
+  
+    def print(self, indent, write):
+      if self.if_token is not None:
+        write(' ' * indent + text[self.if_token.start : self.if_token.end] + '\n')
+      for subtree in self.left:
+        subtree.print(indent + 2, write)
+      if self.else_token is not None:
+        write(' ' * indent + text[self.else_token.start : self.else_token.end] + '\n')
+      for subtree in self.right:
+        subtree.print(indent + 2, write)
+      if self.fi_token is not None:
+        write(' ' * indent + text[self.fi_token.start : self.fi_token.end] + '\n')
+
+  def _parse_conditional_tree() -> Optional[ConditionNode]:
+
+    def print_abort(error_finding, tree):
+      os.sys.stderr.write(
+          f'Warning: Found {error_finding}! Not removing any conditional'
+          ' blocks...\n'
+      )
+      os.sys.stderr.write(
+          f'         This is the matched tree (as built up to the error):\n'
+      )
+      tree.print(indent=9, write=os.sys.stderr.write)
+      os.sys.stderr.write(
+          f'         Potentially, you need to supply an exception using'
+          f" --if_exceptions'.\n"
+      )
+
+    toplevel_tree = ConditionNode(NodeKind.TOPLEVEL)
+    tree = toplevel_tree
+    p = regex.compile(r'(?!(?<=\\newif\s*))\\if([a-zA-Z]*)|\\else(?![a-zA-Z])|\\fi(?![a-zA-Z])')
+    for m in p.finditer(text):
+      match = m.group()
+
+      if match == r'\iffalse':
+        subtree = ConditionNode(
+          NodeKind.IFFALSE,
+          if_token = TokenRange(m.start(), m.end())
+        )
+        tree.add_subtree(subtree)
+        tree = subtree
+      elif match == r'\iftrue':
+        subtree = ConditionNode(
+          NodeKind.IFTRUE,
+          if_token = TokenRange(m.start(), m.end())
+        )
+        tree.add_subtree(subtree)
+        tree = subtree
+      elif match == r'\if':
+        tokens = regex.match(r'^\s*([a-zA-Z0-9])([a-zA-Z0-9 \n])', text[m.end():])
+        if tokens:
+          subtree = ConditionNode(
+            NodeKind.IFTRUE if tokens.group(1) == tokens.group(2) else NodeKind.IFFALSE,
+            if_token = TokenRange(m.start(), m.end() + tokens.end(), False)
+          )
+        else:
+          subtree = ConditionNode(
+            NodeKind.UNKNOWN,
+            if_token = TokenRange(m.start(), m.end())
+          )
+        tree.add_subtree(subtree)
+        tree = subtree
+      elif match.startswith(r'\if'):
+        if match[1:] in exceptions:
+          continue
+        subtree = ConditionNode(
+          NodeKind.UNKNOWN,
+          if_token = TokenRange(m.start(), m.end())
+        )
+        tree.add_subtree(subtree)
+        tree = subtree
+      elif match == r'\else':
+        if tree.parent is None:
+          print_abort(r'unmatched \else', toplevel_tree)
+          return None
+        elif tree.else_token is not None:
+          print_abort(r'duplicate \else', toplevel_tree)
+          return None
+
+        tree.else_token = TokenRange(m.start(), m.end())
+      elif m.group() == r'\fi':
+        if tree.parent is None:
+          print_abort(r'unmatched \fi', toplevel_tree)
+          return None
+
+        tree.fi_token = TokenRange(m.start(), m.end())
+        tree = tree.parent
       else:
-        positions_to_delete.append((tree['start'].start(), tree['start'].end()))
-        positions_to_delete.append((tree['end'].start(), tree['end'].end()))
-    elif tree['kind'] == 'unknown':
-      for subtree in tree['left']:
-        traverse_tree(subtree)
-      for subtree in tree['right']:
-        traverse_tree(subtree)
+        raise RuntimeError('Unreachable!')
+
+    if tree.parent is not None:
+      print_abort('unmatched ' + text[tree.if_token.start : tree.if_token.end], toplevel_tree)
+      return None
+
+    return toplevel_tree
+
+  def _get_deletion_ranges(tree: ConditionNode):
+    ranges = []
+    if tree.kind == NodeKind.TOPLEVEL:
+      for subtree in tree.left:
+        ranges.extend(_get_deletion_ranges(subtree))
+    elif tree.kind == NodeKind.IFFALSE:
+      if tree.else_token is not None:
+        ranges.append(tree.if_token.extend_to(tree.else_token))
+        for subtree in tree.right:
+          ranges.extend(_get_deletion_ranges(subtree))
+        ranges.append(tree.fi_token)
+      else:
+        ranges.append(tree.if_token.extend_to(tree.fi_token))
+    elif tree.kind == NodeKind.IFTRUE:
+      if tree.else_token is not None:
+        ranges.append(tree.if_token)
+        for subtree in tree.left:
+          ranges.extend(_get_deletion_ranges(subtree))
+        ranges.append(tree.else_token.extend_to(tree.fi_token))
+      else:
+        ranges.append(tree.if_token)
+        ranges.append(tree.fi_token)
+    elif tree.kind == NodeKind.UNKNOWN:
+      for subtree in tree.left:
+        ranges.extend(_get_deletion_ranges(subtree))
+      for subtree in tree.right:
+        ranges.extend(_get_deletion_ranges(subtree))
     else:
       raise ValueError('Unreachable!')
+    return ranges
 
-  for tree in toplevel_tree['left']:
-    traverse_tree(tree)
+  def _delete_ranges(text: str, ranges: List[TokenRange]):
+    for token_range in reversed(ranges):
+      start = token_range.start
+      end = token_range.end
+      gobble_trailing_space = token_range.gobble_trailing_space
 
-  for start, end in reversed(positions_to_delete):
-    if end < len(text) and text[end].isspace():
-      end_to_del = end + 1
-    else:
-      end_to_del = end
-    text = text[:start] + text[end_to_del:]
+      # Check if a blank line would be created by this deletion.
+      # TeX interprets blank lines specially, so we avoid these.
+      prev_newline_idx = text.rfind('\n', 0, start)
+      line_start_idx = prev_newline_idx + 1
+      deletion_starts_new_line = text[line_start_idx : start].isspace() or len(text[line_start_idx : start]) == 0
+      next_newline_idx = text.find('\n', end)
+      line_end_idx = next_newline_idx + 1 if next_newline_idx > -1 else len(text)
+      text_after_deletion = (
+        text[end:next_newline_idx]
+        if next_newline_idx > -1
+        else text[end:]
+      )
+      deletion_ends_new_line = (
+        text_after_deletion.isspace() or len(text_after_deletion) == 0
+      )
+      if deletion_starts_new_line and deletion_ends_new_line:
+        start_to_del = line_start_idx
+        end_to_del = line_end_idx
+      else:
+        start_to_del = start
+        end_to_del = end
+        # We sometimes have to remove trailing whitespace.
+        # Example: `ab\iftrue cd\fi ef` produces `abcdef`.
+        # We should not remove trailing whitespace, if there is a command in front of
+        # the deletion, e.g. `\test\iftrue ab\fi` should produce `\test ab`, not `\testab`.
+        if gobble_trailing_space:
+          command_in_front = (regex.search(r'\\[a-zA-Z]*\Z', text[:start]) != None)
+          if not command_in_front:
+            while len(text) > end_to_del and text[end_to_del] in ["\t", " "]:
+              end_to_del += 1
 
-  return text
+      text = text[:start_to_del] + text[end_to_del:]
+
+    return text
+
+  tree = _parse_conditional_tree()
+  if tree is None:
+    return text
+
+  ranges = _get_deletion_ranges(tree)
+  return _delete_ranges(text, ranges)
 
 
 def _remove_comments_inline(text):
