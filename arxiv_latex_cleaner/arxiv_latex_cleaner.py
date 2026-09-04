@@ -16,6 +16,7 @@
 import collections
 import contextlib
 import copy
+import dataclasses
 import logging
 import os
 import pathlib
@@ -188,6 +189,19 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
   to stderr and return the original text.
   """
   p = regex.compile(r'(?!(?<=\\newif\s*))\\if([a-zA-Z]*)|\\else(?![a-zA-Z])|\\fi(?![a-zA-Z])')
+
+
+  @dataclasses.dataclass
+  class TokenRange:
+    start: int
+    end: int
+    gobble_trailing_space: bool = True
+
+    def extend_to(self, other: 'TokenRange') -> 'TokenRange':
+      assert self.end <= other.start
+      return TokenRange(self.start, other.end, other.gobble_trailing_space)
+
+
   toplevel_tree = {'left': [], 'right': [], 'kind': 'toplevel', 'parent': None}
 
   tree = toplevel_tree
@@ -263,15 +277,15 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
 
   def print_tree(tree, indent, write):
     if 'start' in tree:
-      write(' ' * indent + tree['start'].group() + '\n')
+      write(' ' * indent + text[tree['start'].start : tree['start'].end] + '\n')
     for subtree in tree['left']:
       print_tree(subtree, indent + 2, write)
     if 'else' in tree:
-      write(' ' * indent + tree['else'].group() + '\n')
+      write(' ' * indent + text[tree['else'].start : tree['else'].end] + '\n')
     for subtree in tree['right']:
-      print_tree(subtree, indent + 2)
+      print_tree(subtree, indent + 2, write)
     if 'end' in tree:
-      write(' ' * indent + tree['end'].group() + '\n')
+      write(' ' * indent + text[tree['end'].start : tree['end'].end] + '\n')
 
   def print_abort(error_finding):
     os.sys.stderr.write(
@@ -292,29 +306,29 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
 
     if match == r'\iffalse':
       subtree = new_subtree('iffalse')
-      subtree['start'] = (m.start(), m.end())
+      subtree['start'] = TokenRange(m.start(), m.end())
       add_subtree(tree, subtree)
       tree = subtree
     elif match == r'\iftrue':
       subtree = new_subtree('iftrue')
-      subtree['start'] = (m.start(), m.end())
+      subtree['start'] = TokenRange(m.start(), m.end())
       add_subtree(tree, subtree)
       tree = subtree
     elif match == r'\if':
       tokens = regex.match(r'^\s*([a-zA-Z0-9])([a-zA-Z0-9 \n])', text[m.end():])
       if tokens:
         subtree = new_subtree('iftrue' if tokens.group(1) == tokens.group(2) else 'iffalse')
-        subtree['start'] = (m.start(), m.end() + tokens.end(), False)
+        subtree['start'] = TokenRange(m.start(), m.end() + tokens.end(), False)
       else:
         subtree = new_subtree('unknown')
-        subtree['start'] = (m.start(), m.end())
+        subtree['start'] = TokenRange(m.start(), m.end())
       add_subtree(tree, subtree)
       tree = subtree
     elif match.startswith(r'\if'):
       if match[1:] in exceptions:
         continue
       subtree = new_subtree('unknown')
-      subtree['start'] = (m.start(), m.end())
+      subtree['start'] = TokenRange(m.start(), m.end())
       add_subtree(tree, subtree)
       tree = subtree
     elif match == r'\else':
@@ -325,19 +339,19 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
         print_abort(r'duplicate \else')
         return text
 
-      tree['else'] = (m.start(), m.end())
+      tree['else'] = TokenRange(m.start(), m.end())
     elif m.group() == r'\fi':
       if tree['parent'] is None:
         print_abort(r'unmatched \fi')
         return text
 
-      tree['end'] = (m.start(), m.end())
+      tree['end'] = TokenRange(m.start(), m.end())
       tree = tree['parent']
     else:
       raise RuntimeError('Unreachable!')
 
   if tree['parent'] is not None:
-    print_abort('unmatched ' + tree['start'].group())
+    print_abort('unmatched ' + text[tree['start'].start : tree['start'].end])
     return text
 
   positions_to_delete = []
@@ -345,18 +359,18 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
   def traverse_tree(tree):
     if tree['kind'] == 'iffalse':
       if 'else' in tree:
-        positions_to_delete.append((tree['start'][0], tree['else'][1]))
+        positions_to_delete.append(tree['start'].extend_to(tree['else']))
         for subtree in tree['right']:
           traverse_tree(subtree)
         positions_to_delete.append(tree['end'])
       else:
-        positions_to_delete.append((tree['start'][0], tree['end'][1]))
+        positions_to_delete.append(tree['start'].extend_to(tree['end']))
     elif tree['kind'] == 'iftrue':
       if 'else' in tree:
         positions_to_delete.append(tree['start'])
         for subtree in tree['left']:
           traverse_tree(subtree)
-        positions_to_delete.append((tree['else'][0], tree['end'][1]))
+        positions_to_delete.append(tree['else'].extend_to(tree['end']))
       else:
         positions_to_delete.append(tree['start'])
         positions_to_delete.append(tree['end'])
@@ -371,12 +385,10 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
   for tree in toplevel_tree['left']:
     traverse_tree(tree)
 
-  for entry in reversed(positions_to_delete):
-    gobble_trailing_space = True
-    if len(entry) == 3:
-      (start, end, gobble_trailing_space) = entry
-    else:
-      (start, end) = entry
+  for token_range in reversed(positions_to_delete):
+    start = token_range.start
+    end = token_range.end
+    gobble_trailing_space = token_range.gobble_trailing_space
 
     # Check if a blank line would be created by this deletion.
     # TeX interprets blank lines specially, so we avoid these.
