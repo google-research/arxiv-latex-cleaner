@@ -187,7 +187,7 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
   If the conditional tree is malformed, the function will print a warning
   to stderr and return the original text.
   """
-  p = regex.compile(r'(?!(?<=\\newif\s*))\\if\s*(\w+)|\\else(?!\w)|\\fi(?!\w)')
+  p = regex.compile(r'(?!(?<=\\newif\s*))\\if([a-zA-Z]*)|\\else(?![a-zA-Z])|\\fi(?![a-zA-Z])')
   toplevel_tree = {'left': [], 'right': [], 'kind': 'toplevel', 'parent': None}
 
   tree = toplevel_tree
@@ -288,25 +288,36 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
     )
 
   for m in p.finditer(text):
-    m_no_space = m.group().replace(' ', '')
-    if m_no_space == r'\iffalse' or m_no_space == r'\if0':
+    match = m.group()
+
+    if match == r'\iffalse':
       subtree = new_subtree('iffalse')
-      subtree['start'] = m
+      subtree['start'] = (m.start(), m.end())
       add_subtree(tree, subtree)
       tree = subtree
-    elif m_no_space == r'\iftrue' or m_no_space == r'\if1':
+    elif match == r'\iftrue':
       subtree = new_subtree('iftrue')
-      subtree['start'] = m
+      subtree['start'] = (m.start(), m.end())
       add_subtree(tree, subtree)
       tree = subtree
-    elif m_no_space.startswith(r'\if'):
-      if m_no_space[1:] in exceptions:
+    elif match == r'\if':
+      tokens = regex.match(r'^\s*([a-zA-Z0-9])([a-zA-Z0-9 \n])', text[m.end():])
+      if tokens:
+        subtree = new_subtree('iftrue' if tokens.group(1) == tokens.group(2) else 'iffalse')
+        subtree['start'] = (m.start(), m.end() + tokens.end(), False)
+      else:
+        subtree = new_subtree('unknown')
+        subtree['start'] = (m.start(), m.end())
+      add_subtree(tree, subtree)
+      tree = subtree
+    elif match.startswith(r'\if'):
+      if match[1:] in exceptions:
         continue
       subtree = new_subtree('unknown')
-      subtree['start'] = m
+      subtree['start'] = (m.start(), m.end())
       add_subtree(tree, subtree)
       tree = subtree
-    elif m_no_space == r'\else':
+    elif match == r'\else':
       if tree['parent'] is None:
         print_abort(r'unmatched \else')
         return text
@@ -314,13 +325,13 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
         print_abort(r'duplicate \else')
         return text
 
-      tree['else'] = m
+      tree['else'] = (m.start(), m.end())
     elif m.group() == r'\fi':
       if tree['parent'] is None:
         print_abort(r'unmatched \fi')
         return text
 
-      tree['end'] = m
+      tree['end'] = (m.start(), m.end())
       tree = tree['parent']
     else:
       raise RuntimeError('Unreachable!')
@@ -334,21 +345,21 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
   def traverse_tree(tree):
     if tree['kind'] == 'iffalse':
       if 'else' in tree:
-        positions_to_delete.append((tree['start'].start(), tree['else'].end()))
+        positions_to_delete.append((tree['start'][0], tree['else'][1]))
         for subtree in tree['right']:
           traverse_tree(subtree)
-        positions_to_delete.append((tree['end'].start(), tree['end'].end()))
+        positions_to_delete.append(tree['end'])
       else:
-        positions_to_delete.append((tree['start'].start(), tree['end'].end()))
+        positions_to_delete.append((tree['start'][0], tree['end'][1]))
     elif tree['kind'] == 'iftrue':
       if 'else' in tree:
-        positions_to_delete.append((tree['start'].start(), tree['start'].end()))
+        positions_to_delete.append(tree['start'])
         for subtree in tree['left']:
           traverse_tree(subtree)
-        positions_to_delete.append((tree['else'].start(), tree['end'].end()))
+        positions_to_delete.append((tree['else'][0], tree['end'][1]))
       else:
-        positions_to_delete.append((tree['start'].start(), tree['start'].end()))
-        positions_to_delete.append((tree['end'].start(), tree['end'].end()))
+        positions_to_delete.append(tree['start'])
+        positions_to_delete.append(tree['end'])
     elif tree['kind'] == 'unknown':
       for subtree in tree['left']:
         traverse_tree(subtree)
@@ -360,7 +371,13 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
   for tree in toplevel_tree['left']:
     traverse_tree(tree)
 
-  for start, end in reversed(positions_to_delete):
+  for entry in reversed(positions_to_delete):
+    gobble_trailing_space = True
+    if len(entry) == 3:
+      (start, end, gobble_trailing_space) = entry
+    else:
+      (start, end) = entry
+
     # Check if a blank line would be created by this deletion.
     # TeX interprets blank lines specially, so we avoid these.
     prev_newline_idx = text.rfind('\n', 0, start)
@@ -368,7 +385,14 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
     deletion_starts_new_line = text[line_start_idx : start].isspace() or len(text[line_start_idx : start]) == 0
     next_newline_idx = text.find('\n', end)
     line_end_idx = next_newline_idx + 1 if next_newline_idx > -1 else len(text)
-    deletion_ends_new_line = text[end:next_newline_idx].isspace() or len(text[end:next_newline_idx]) == 0
+    text_after_deletion = (
+      text[end:next_newline_idx]
+      if next_newline_idx > -1
+      else text[end:]
+    )
+    deletion_ends_new_line = (
+      text_after_deletion.isspace() or len(text_after_deletion) == 0
+    )
     if deletion_starts_new_line and deletion_ends_new_line:
       start_to_del = line_start_idx
       end_to_del = line_end_idx
@@ -379,10 +403,11 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
       # Example: `ab\iftrue cd\fi ef` produces `abcdef`.
       # We should not remove trailing whitespace, if there is a command in front of
       # the deletion, e.g. `\test\iftrue ab\fi` should produce `\test ab`, not `\testab`.
-      command_in_front = (regex.search(r'\\[a-zA-Z]*\Z', text[:start]) != None)
-      if not command_in_front:
-        while len(text) > end_to_del and text[end_to_del] in ["\t", " "]:
-          end_to_del += 1
+      if gobble_trailing_space:
+        command_in_front = (regex.search(r'\\[a-zA-Z]*\Z', text[:start]) != None)
+        if not command_in_front:
+          while len(text) > end_to_del and text[end_to_del] in ["\t", " "]:
+            end_to_del += 1
 
     text = text[:start_to_del] + text[end_to_del:]
 
