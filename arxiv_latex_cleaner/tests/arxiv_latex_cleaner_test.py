@@ -290,8 +290,23 @@ class UnitTests(parameterized.TestCase):
       },
       {
           'testcase_name': 'percent',
-          'line_in': r'100\% accurate\n',
-          'true_output': r'100\% accurate\n',
+          'line_in': r'100\% accurate' + '\n',
+          'true_output': r'100\% accurate' + '\n',
+      },
+      {
+          'testcase_name': 'breakline_with_comment',
+          'line_in': r'\\% comment' + '\n',
+          'true_output': r'\\%' + '\n',
+      },
+      {
+          'testcase_name': 'breakline_with_literal_percent',
+          'line_in': r'\\\% no comment' + '\n',
+          'true_output': r'\\\% no comment' + '\n',
+      },
+      {
+          'testcase_name': 'breakline_with_literal_percent_and_comment',
+          'line_in': r'\\\% no comment\\% comment' + '\n',
+          'true_output': r'\\\% no comment\\%' + '\n',
       },
       {
           'testcase_name': 'comment',
@@ -302,6 +317,11 @@ class UnitTests(parameterized.TestCase):
           'testcase_name': 'comment_inline',
           'line_in': 'Foo %Comment\n',
           'true_output': 'Foo %\n',
+      },
+      {
+          'testcase_name': 'comment_inline_with_tab_and_space',
+          'line_in': '\t %Y\n',
+          'true_output': '',
       },
       {
           'testcase_name': 'url_with_percent',
