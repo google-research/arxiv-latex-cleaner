@@ -53,7 +53,9 @@ python setup.py install
 *   Removes all auxiliary files (`.aux`, `.log`, `.out`, etc.).
 *   Removes all comments from your code (yes, those are visible on arXiv and you
     do not want them to be). These also include `\begin{comment}\end{comment}`,
-    `\iffalse\fi`, and `\if0\fi` environments.
+    `\iffalse\fi`, and `\if0\fi` environments. A `%` inside `verbatim`,
+    `lstlisting` and `minted` environments is code and stays; other such
+    environments can be named with `verbatim_environments`.
 *   Optionally removes user-defined commands entered with `commands_to_delete`
     (such as `\todo{}` that you redefine as the empty string at the end).
 *   Optionally allows you to define custom regex replacement rules through a
@@ -129,6 +131,7 @@ usage: arxiv_latex_cleaner@v1.0.11 [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]]
                                    [--commands_only_to_delete COMMANDS_ONLY_TO_DELETE [COMMANDS_ONLY_TO_DELETE ...]]
                                    [--environments_to_delete ENVIRONMENTS_TO_DELETE [ENVIRONMENTS_TO_DELETE ...]]
+                                   [--verbatim_environments VERBATIM_ENVIRONMENTS [VERBATIM_ENVIRONMENTS ...]]
                                    [--if_exceptions IF_EXCEPTIONS [IF_EXCEPTIONS ...]]
                                    [--use_external_tikz USE_EXTERNAL_TIKZ]
                                    [--svg_inkscape [SVG_INKSCAPE]]
@@ -188,6 +191,11 @@ optional arguments:
                         cannot come immediately after
                         `environments_to_delete`, as the parser does not have
                         any way to know if it's another environment to delete.
+  --verbatim_environments VERBATIM_ENVIRONMENTS [VERBATIM_ENVIRONMENTS ...]
+                        LaTeX environments whose content is left alone,
+                        comments included, on top of verbatim, Verbatim,
+                        lstlisting and minted. Useful for environments that
+                        show code, where a % is part of the code.
   --if_exceptions IF_EXCEPTIONS [IF_EXCEPTIONS ...]
                         Constant TeX primitive conditionals (\iffalse, \iftrue,
                         etc.) are simplified, i.e., true branches are kept, false
