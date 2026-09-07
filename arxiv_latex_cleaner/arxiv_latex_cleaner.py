@@ -370,6 +370,10 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
   return text
 
 
+# A % inside these environments is code, not a comment.
+VERBATIM_ENVIRONMENTS = ['verbatim', 'Verbatim', 'lstlisting', 'minted']
+
+
 def _remove_comments_inline(text):
   """Removes the comments from the string 'text' and ignores % inside \\url{}."""
   auto_ignore_pattern = r'(%\s*auto-ignore).*'
@@ -411,6 +415,50 @@ def _remove_comments_inline(text):
   )
 
 
+def _remove_comments_from_lines(text, continues_line=False):
+  """Removes the comments from every line of 'text'.
+
+  'continues_line' says that 'text' starts in the middle of a line, right
+  after a verbatim environment, so its first line cannot be a comment line.
+  """
+  lines = text.splitlines(True)
+  if not lines:
+    return text
+  cleaned = []
+  for i, line in enumerate(lines):
+    if i == 0 and continues_line:
+      # A % at the start of this piece is an inline comment, not a comment
+      # line. A leading character keeps _remove_comments_inline from dropping
+      # the whole line.
+      cleaned.append(_remove_comments_inline('x' + line)[1:])
+    else:
+      cleaned.append(_remove_comments_inline(line))
+  if not lines[-1].endswith('\n') and cleaned[-1] == lines[-1] + '\n':
+    # The last line stops short, at the \begin of a verbatim environment. It
+    # only gets a newline when a comment was cut from it, since the comment
+    # would run on into the environment otherwise.
+    cleaned[-1] = lines[-1]
+  return ''.join(cleaned)
+
+
+def _remove_comments(text, verbatim_environments=()):
+  """Removes the comments from 'text', leaving verbatim environments alone."""
+  environments = list(VERBATIM_ENVIRONMENTS) + list(verbatim_environments)
+  names = '|'.join(regex.escape(name) for name in environments)
+  pattern = r'\\begin\{((?:' + names + r')\*?)}[\s\S]*?\\end\{\1}'
+
+  pieces = []
+  position = 0
+  for match in regex.finditer(pattern, text):
+    pieces.append(
+        _remove_comments_from_lines(text[position : match.start()], position > 0)
+    )
+    pieces.append(match.group(0))
+    position = match.end()
+  pieces.append(_remove_comments_from_lines(text[position:], position > 0))
+  return ''.join(pieces)
+
+
 def _strip_tex_contents(lines, end_str):
   """Removes everything after end_str."""
   for i in range(len(lines)):
@@ -446,8 +494,10 @@ def _write_file_content(content, filename):
 
 def _remove_comments_and_commands_to_delete(content, parameters):
   """Erases all LaTeX comments in the content, and writes it."""
-  content = [_remove_comments_inline(line) for line in content]
-  content = _remove_environment(''.join(content), 'comment')
+  content = _remove_comments(
+      ''.join(content), parameters.get('verbatim_environments', [])
+  )
+  content = _remove_environment(content, 'comment')
   content = _simplify_conditional_blocks(
       content, parameters.get('if_exceptions', [])
   )

@@ -321,6 +321,54 @@ class UnitTests(parameterized.TestCase):
 
   @parameterized.named_parameters(
       {
+          'testcase_name': 'listing',
+          'text_in': (
+              'Foo % Comment\n'
+              '\\begin{lstlisting}[language=C]\n'
+              'x = 1 % not a comment\n'
+              '  % neither is this\n'
+              '\\end{lstlisting}\n'
+              'Bar % Comment\n'
+          ),
+          'true_output': (
+              'Foo %\n'
+              '\\begin{lstlisting}[language=C]\n'
+              'x = 1 % not a comment\n'
+              '  % neither is this\n'
+              '\\end{lstlisting}\n'
+              'Bar %\n'
+          ),
+      },
+      {
+          'testcase_name': 'starred_verbatim',
+          'text_in': '\\begin{verbatim*}\n50% off\n\\end{verbatim*}\n% Comment\n',
+          'true_output': '\\begin{verbatim*}\n50% off\n\\end{verbatim*}\n',
+      },
+      {
+          'testcase_name': 'text_before_begin_on_the_same_line',
+          'text_in': 'Foo \\begin{minted}{c}\nx % y\n\\end{minted} % Comment\n',
+          'true_output': 'Foo \\begin{minted}{c}\nx % y\n\\end{minted} %\n',
+      },
+      {
+          'testcase_name': 'custom_environment',
+          'text_in': '\\begin{code}\nx % y\n\\end{code}\n',
+          'verbatim_environments': ['code'],
+          'true_output': '\\begin{code}\nx % y\n\\end{code}\n',
+      },
+      {
+          'testcase_name': 'unknown_environment_is_cleaned',
+          'text_in': '\\begin{code}\nx % y\n\\end{code}\n',
+          'true_output': '\\begin{code}\nx %\n\\end{code}\n',
+      },
+  )
+  def test_remove_comments(self, text_in, true_output, verbatim_environments=()):
+    self.assertEqual(
+        arxiv_latex_cleaner._remove_comments(text_in, verbatim_environments),
+        true_output,
+    )
+
+  @parameterized.named_parameters(
+      {
           'testcase_name': 'no_command',
           'text_in': 'Foo\nFoo2\n',
           'keep_text': False,
