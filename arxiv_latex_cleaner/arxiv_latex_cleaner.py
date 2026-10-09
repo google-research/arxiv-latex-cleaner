@@ -701,11 +701,52 @@ def _resize_pdf_figure(
     print('Errors: ', errs)
 
 
+def _referenced_latex_support_files(contents):
+  r"""Find explicitly referenced local .sty, .cls, .bst and .bib resources.
+
+  Unlike \includegraphics, \usepackage and \bibliographystyle usually omit
+  their file extensions. Matching an exact project-relative path avoids
+  copying unrelated files that happen to share a basename.
+  """
+  commands = {
+      'usepackage': '.sty',
+      'RequirePackage': '.sty',
+      'documentclass': '.cls',
+      'LoadClass': '.cls',
+      'bibliographystyle': '.bst',
+      'bibliography': '.bib',
+      'addbibresource': '.bib',
+  }
+  pattern = (
+      r'\\(' + '|'.join(commands) + r')'
+      r'(?:\s*\[[^\]]*\])?\s*\{([^{}]+)\}'
+  )
+  referenced = set()
+  for match in regex.finditer(pattern, contents):
+    suffix = commands[match.group(1)]
+    for name in match.group(2).split(','):
+      name = name.strip()
+      if not name or '\\' in name:
+        continue
+      # The TeX compilation root is the input project folder. Do not
+      # resolve an absolute path or a path leading outside that folder.
+      name = os.path.normpath(name).replace('\\', '/')
+      if os.path.isabs(name) or name == '..' or name.startswith('../'):
+        continue
+      if not name.endswith(suffix):
+        name += suffix
+      referenced.add(name)
+  return referenced
+
+
 def _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits):
-  for fn in _keep_only_referenced(
-      splits['non_tex_not_in_root'], contents, strict=True
-  ):
-    _copy_file(fn, parameters)
+  referenced_support_files = _referenced_latex_support_files(contents)
+  for fn in splits['non_tex_not_in_root']:
+    if (
+        fn in referenced_support_files
+        or _search_reference(fn, contents, strict=True) is not None
+    ):
+      _copy_file(fn, parameters)
 
 def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
     """Modified to handle PNG to JPG conversion and reference updates."""
