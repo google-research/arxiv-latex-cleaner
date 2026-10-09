@@ -143,6 +143,18 @@ def _remove_command(text, command, keep_text=False):
         temp_substring = text[match.span()[0] : match.span()[1]]
         new_substring = extract_text_inside_curly_braces(temp_substring)
 
+      if keep_text:
+        # A command on its own line may wrap text with newlines inside its
+        # braces. Removing just the command leaves two newlines at the opening
+        # and closing boundaries, creating a TeX paragraph (invalid inside
+        # commands such as \\caption). Remove only these redundant boundaries.
+        before = text[: match.start()]
+        after = text[match.end() :]
+        if regex.search(r'(?:^|\n)[ \t]*$', before):
+          new_substring = regex.sub(r'^\n[ \t]*', '', new_substring, count=1)
+        if regex.match(r'[ \t]*\n', after):
+          new_substring = regex.sub(r'\n[ \t]*$', '', new_substring)
+
       if match.span()[1] < len(text):
         next_newline = text[match.span()[1] :].find('\n')
         if next_newline != -1:
