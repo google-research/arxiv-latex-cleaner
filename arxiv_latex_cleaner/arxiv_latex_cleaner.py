@@ -707,8 +707,50 @@ def _copy_only_referenced_non_tex_not_in_root(parameters, contents, splits):
   ):
     _copy_file(fn, parameters)
 
-def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
-    """Modified to handle PNG to JPG conversion and reference updates."""
+def _find_parent_relative_figures(figures, tex_contents, tex_files):
+  """Resolve ../figure references relative to their source TeX files.
+
+  Figures are still copied using their project-relative paths, preserving the
+  original LaTeX reference in the copied TeX file. References escaping the
+  input project root are not eligible for copying.
+  """
+  candidates = {
+      file.casefold(): file for file in figures
+  }
+  referenced = set()
+  for tex_file in tex_files:
+    content = tex_contents[tex_file]
+    if isinstance(content, list):
+      content = ''.join(content)
+    source_dir = os.path.dirname(tex_file)
+    for match in regex.finditer(r'\{([^{}]+)\}', content):
+      target = match.group(1).strip()
+      if not target.startswith('../') or '\\' in target:
+        continue
+      relative_path = os.path.normpath(
+          os.path.join(source_dir, target)
+      ).replace('\\', '/')
+      if (
+          os.path.isabs(relative_path)
+          or relative_path == '..'
+          or relative_path.startswith('../')
+      ):
+        continue
+      # In LaTeX, the extension may be omitted in \includegraphics.
+      match_name = candidates.get(relative_path.casefold())
+      if match_name is not None:
+        referenced.add(match_name)
+      else:
+        for figure in figures:
+          if os.path.splitext(figure)[0].casefold() == relative_path.casefold():
+            referenced.add(figure)
+  return referenced
+
+
+def _resize_and_copy_figures_if_referenced(
+    parameters, contents, splits, tex_contents=None
+):
+    """Copy referenced figures, including ../ paths from nested TeX files."""
     image_size = collections.defaultdict(lambda: parameters['im_size'])
     image_size.update(parameters['images_allowlist'])
     pdf_resolution = collections.defaultdict(
@@ -720,9 +762,19 @@ def _resize_and_copy_figures_if_referenced(parameters, contents, splits):
     
     filename_changes = {}  # Track PNG -> JPG filename changes
     
-    for image_file in _keep_only_referenced(
-        splits['figures'], contents, strict=False
-    ):
+    referenced = set(
+        _keep_only_referenced(splits['figures'], contents, strict=False)
+    )
+    if tex_contents is not None:
+        referenced.update(
+            _find_parent_relative_figures(
+                splits['figures'], tex_contents, splits['tex_to_copy']
+            )
+        )
+
+    for image_file in splits['figures']:
+        if image_file not in referenced:
+            continue
         actual_output_filename = _resize_and_copy_figure(
             filename=image_file,
             origin_folder=parameters['input_folder'],
@@ -1006,7 +1058,9 @@ def run_arxiv_cleaner(parameters):
       logging.info('Copying non-tex file %s.', non_tex_file)
       _copy_file(non_tex_file, parameters)
 
-    filename_changes = _resize_and_copy_figures_if_referenced(parameters, full_content, splits)
+    filename_changes = _resize_and_copy_figures_if_referenced(
+        parameters, full_content, splits, tex_contents=tex_contents
+    )
     logging.info('Outputs written to %s', parameters['output_folder'])
 
     # Update LaTeX references for changed filenames if tex_contents_dict is provided
