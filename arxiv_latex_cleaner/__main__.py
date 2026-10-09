@@ -19,6 +19,7 @@
     $ python -m arxiv_latex_cleaner --help
 """
 import argparse
+import copy
 import json
 import logging
 
@@ -227,25 +228,50 @@ PARSER.add_argument(
     help="Enable detailed output.",
 )
 
-ARGS = vars(PARSER.parse_args())
+def parse_arguments(argv=None):
+  """Apply YAML settings, then only options explicitly supplied on the CLI.
 
-if ARGS["config"] is not None:
+  argparse otherwise fills in false/empty/numeric defaults which accidentally
+  override user-selected YAML values, even when those flags were not supplied.
+  """
+  args = vars(PARSER.parse_args(argv))
+  config_path = args.get('config')
+  if config_path is None:
+    args.pop('config', None)
+    return args
+
   try:
-    with open(ARGS["config"], "r") as config_file:
-      config_params = yaml.safe_load(config_file)
-    final_args = merge_args_into_config(ARGS, config_params)
-
+    with open(config_path, 'r', encoding='utf-8') as config_file:
+      config_params = yaml.safe_load(config_file) or {}
   except FileNotFoundError:
-    print(f"config file {ARGS.config} not found.")
-    final_args = ARGS
-    final_args.pop("config", None)
-else:
-  final_args = ARGS
+    PARSER.error(f'config file {config_path} not found.')
 
-if final_args.get("verbose", False):
-  logging.basicConfig(level=logging.INFO)
-else:
-  logging.basicConfig(level=logging.ERROR)
+  if not isinstance(config_params, dict):
+    PARSER.error('config file must contain a YAML mapping')
 
-run_arxiv_cleaner(final_args)
-exit(0)
+  # Parse again with suppressed defaults to recognize actual CLI overrides.
+  # The positional input_folder remains mandatory and overrides YAML.
+  explicit_parser = copy.deepcopy(PARSER)
+  for action in explicit_parser._actions:
+    if action.option_strings:
+      action.default = argparse.SUPPRESS
+  explicitly_supplied = vars(explicit_parser.parse_args(argv))
+
+  # Retain argparse defaults for any key not set in YAML, without letting
+  # those defaults erase values explicitly specified in the config file.
+  defaults_with_config = dict(args)
+  defaults_with_config.update(config_params)
+  overrides = {
+      key: args[key] for key in explicitly_supplied if key in args
+  }
+  final_args = merge_args_into_config(overrides, defaults_with_config)
+  final_args.pop('config', None)
+  return final_args
+
+
+if __name__ == '__main__':
+  final_args = parse_arguments()
+  logging.basicConfig(
+      level=logging.INFO if final_args.get('verbose', False) else logging.ERROR
+  )
+  run_arxiv_cleaner(final_args)

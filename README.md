@@ -17,6 +17,12 @@ Or simply from a config file
 arxiv_latex_cleaner /path/to/latex --config cleaner_config.yaml
 ```
 
+Options explicitly set in the YAML file (for example, `keep_bib: true`,
+`verbose: true`, or `im_size: 800`) are retained unless the corresponding
+command-line option is supplied. CLI values take precedence when provided;
+list options add CLI entries before YAML entries, and image allowlist mappings
+are merged. Without a config file, the normal CLI defaults apply.
+
 ## Installation:
 
 ```bash
