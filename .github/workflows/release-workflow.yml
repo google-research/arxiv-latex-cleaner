@@ -4,6 +4,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Create a GitHub Release
@@ -13,17 +16,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: ${{ github.ref }} release of `arxiv_latex_cleaner`.
-          draft: false
-          prerelease: false
+          persist-credentials: false
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+          FULL_REF: ${{ github.ref }}
+        run: |
+          gh release create "${TAG_NAME}" \
+            --title "Release ${FULL_REF}" \
+            --notes "${FULL_REF} release of \`arxiv_latex_cleaner\`."
   deploy:
     name: Create a PyPI Release
     runs-on: ubuntu-latest
@@ -47,11 +50,11 @@ jobs:
         run: |
           python setup.py sdist bdist_wheel
       - name: Authenticate to Google Cloud (OSS Exit Gate)
-        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: 'projects/305452601764/locations/global/workloadIdentityPools/builders/providers/github'
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
       - name: Clean up stale releases from staging repo
         run: |
           # clean up stale releases from staging repo
@@ -62,16 +65,19 @@ jobs:
               --format="value(name)" 2>/dev/null)
 
           echo "${packages}" | xargs -r -I {} sh -c '
-              package_name=$(basename "{}")
+              package_name=$(basename "$1")
               echo "Deleting package: $package_name..."
-              gcloud artifacts packages delete "{}" \
+              gcloud artifacts packages delete "$1" \
                   --project="oss-exit-gate-prod" \
                   --location="us" \
                   --repository="arxiv-latex-cleaner--pypi" \
                   --quiet
-          '
+          ' _ {}
 
       - name: Publish via OSS Exit Gate
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           python -m twine upload \
             --repository-url "https://us-python.pkg.dev/oss-exit-gate-prod/arxiv-latex-cleaner--pypi/" \
@@ -80,4 +86,4 @@ jobs:
             dist/*
           echo '{"publish_all": true}' > manifest.json
           gcloud storage cp manifest.json \
-            "gs://oss-exit-gate-prod-projects-bucket/arxiv-latex-cleaner/pypi/manifests/manifest-${{ github.run_id }}-${{ github.run_attempt }}.json"
+            "gs://oss-exit-gate-prod-projects-bucket/arxiv-latex-cleaner/pypi/manifests/manifest-${RUN_ID}-${RUN_ATTEMPT}.json"
