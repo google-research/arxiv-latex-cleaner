@@ -26,12 +26,6 @@ import tempfile
 from PIL import Image
 import regex
 
-PDF_RESIZE_COMMAND = (
-    'gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dNOPAUSE -dQUIET -dBATCH '
-    '-dDownsampleColorImages=true -dColorImageResolution={resolution} '
-    '-dColorImageDownsampleThreshold=1.0 -dAutoRotatePages=/None '
-    '-sOutputFile={output} {input}'
-)
 MAX_FILENAME_LENGTH = 120
 
 # Fix for Windows: Even if '\' (os.sep) is the standard way of making paths on
@@ -685,12 +679,27 @@ def _update_image_references(tex_contents_dict, old_filename, new_filename, verb
 def _resize_pdf_figure(
     filename, origin_folder, destination_folder, resolution, timeout=10
 ):
-  input_file = os.path.join(origin_folder, filename)
-  output_file = os.path.join(destination_folder, filename)
-  bash_command = PDF_RESIZE_COMMAND.format(
-      input=input_file, output=output_file, resolution=resolution
-  )
-  process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
+  """Resizes a PDF figure using Ghostscript."""
+  input_file = os.path.abspath(os.path.join(origin_folder, filename))
+  output_file = os.path.abspath(os.path.join(destination_folder, filename))
+  escaped_output_file = output_file.replace('%', '%%')
+  command = [
+      'gs',
+      '-sDEVICE=pdfwrite',
+      '-dCompatibilityLevel=1.4',
+      '-dSAFER',
+      '-dNOPAUSE',
+      '-dQUIET',
+      '-dBATCH',
+      '-dDownsampleColorImages=true',
+      f'-dColorImageResolution={int(resolution)}',
+      '-dColorImageDownsampleThreshold=1.0',
+      '-dAutoRotatePages=/None',
+      f'-sOutputFile={escaped_output_file}',
+      '-f',
+      input_file,
+  ]
+  process = subprocess.Popen(command, stdout=subprocess.PIPE)
 
   try:
     process.communicate(timeout=timeout)

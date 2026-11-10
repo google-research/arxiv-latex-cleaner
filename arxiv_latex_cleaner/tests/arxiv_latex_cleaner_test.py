@@ -13,9 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from os import path
 import shutil
+import subprocess
+import tempfile
 import unittest
+from unittest import mock
 from absl.testing import parameterized
 from arxiv_latex_cleaner import arxiv_latex_cleaner
 from PIL import Image
@@ -871,6 +875,112 @@ class UnitTests(parameterized.TestCase):
       msg_fmt = 'file {} should' + msg_not + 'have matched latex reference {}'
       msg = msg_fmt.format(filename, content)
       self.assertEqual(matched, true_output, msg)
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'space_and_injected_flags',
+          'origin_folder': 'origin',
+          'destination_folder': 'dest',
+          'filename': 'dir -dNOSAFER -sOutputFile=%pipe%id/fig 1.pdf',
+          'resolution': 300,
+      },
+      {
+          'testcase_name': 'leading_at_and_dash',
+          'origin_folder': '@evil',
+          'destination_folder': '-dest',
+          'filename': '-dNOSAFER.pdf',
+          'resolution': '150',
+      },
+      {
+          'testcase_name': 'percent_format_specifiers',
+          'origin_folder': 'origin',
+          'destination_folder': 'dest',
+          'filename': 'fig_%d_100%.pdf',
+          'resolution': 500,
+      },
+  )
+  def test_resize_pdf_figure_argv_no_injection(
+      self, origin_folder, destination_folder, filename, resolution
+  ):
+    with mock.patch.object(subprocess, 'Popen', autospec=True) as mock_popen:
+      arxiv_latex_cleaner._resize_pdf_figure(
+          filename, origin_folder, destination_folder, resolution
+      )
+
+    expected_input = os.path.abspath(os.path.join(origin_folder, filename))
+    expected_output = os.path.abspath(
+        os.path.join(destination_folder, filename)
+    ).replace('%', '%%')
+    expected_command = [
+        'gs',
+        '-sDEVICE=pdfwrite',
+        '-dCompatibilityLevel=1.4',
+        '-dSAFER',
+        '-dNOPAUSE',
+        '-dQUIET',
+        '-dBATCH',
+        '-dDownsampleColorImages=true',
+        f'-dColorImageResolution={int(resolution)}',
+        '-dColorImageDownsampleThreshold=1.0',
+        '-dAutoRotatePages=/None',
+        f'-sOutputFile={expected_output}',
+        '-f',
+        expected_input,
+    ]
+    mock_popen.assert_called_once_with(expected_command, stdout=subprocess.PIPE)
+
+
+class PdfCompressionTests(unittest.TestCase):
+
+  @unittest.skipIf(shutil.which('gs') is None, 'Ghostscript is not installed.')
+  def test_compress_pdf_prevents_argv_injection(self):
+    with tempfile.TemporaryDirectory() as tmp_dir:
+      canary_file = os.path.join(tmp_dir, 'canary.txt')
+      canary_script = os.path.join(tmp_dir, 'trigger_canary.sh')
+      with open(canary_script, 'w', encoding='utf-8') as f:
+        f.write(f'#!/bin/sh\necho triggered > "{canary_file}"\n')
+      os.chmod(canary_script, 0o755)
+
+      input_dir = os.path.join(tmp_dir, 'proj')
+      crafted_subdir = f'x_%d -dNOSAFER -sOutputFile=%pipe%{canary_script} y'
+      pdf_dir = os.path.join(input_dir, crafted_subdir)
+      os.makedirs(pdf_dir)
+
+      pdf_filename = 'fig 1.pdf'
+      shutil.copy(
+          'test_data/tex/ext_tikz/test1.pdf',
+          os.path.join(pdf_dir, pdf_filename),
+      )
+      with open(
+          os.path.join(input_dir, 'main.tex'), 'w', encoding='utf-8'
+      ) as f:
+        f.write(
+            '\\documentclass{article}\n'
+            '\\begin{document}\n'
+            '\\includegraphics{fig 1}\n'
+            '\\end{document}\n'
+        )
+
+      arxiv_latex_cleaner.run_arxiv_cleaner({
+          'input_folder': input_dir,
+          'images_allowlist': {},
+          'resize_images': False,
+          'im_size': 500,
+          'compress_pdf': True,
+          'pdf_im_resolution': 150,
+          'commands_to_delete': [],
+          'commands_only_to_delete': [],
+          'environments_to_delete': [],
+          'keep_bib': False,
+      })
+
+      self.assertFalse(os.path.exists(canary_file))
+      expected_pdf = os.path.join(
+          f'{input_dir}_arXiv', crafted_subdir, pdf_filename
+      )
+      self.assertTrue(os.path.isfile(expected_pdf))
+      with open(expected_pdf, 'rb') as f:
+        self.assertTrue(f.read(8).startswith(b'%PDF-1.4'))
 
 
 class IntegrationTests(parameterized.TestCase):
