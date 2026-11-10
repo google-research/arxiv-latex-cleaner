@@ -461,6 +461,11 @@ class UnitTests(parameterized.TestCase):
           'true_output': '\\ifvar\n\\fi\n',
       },
       {
+          'testcase_name': 'if_removed_with_nested_iftrue',
+          'text_in': '\\iftrue\n\\iftrue Foo\n\\fi\n\\fi\n',
+          'true_output': 'Foo\n',
+      },
+      {
           'testcase_name': 'if_removed_eof',
           'text_in': '\\iffalse\nFoo\n\\fi',
           'true_output': '',
@@ -490,15 +495,35 @@ class UnitTests(parameterized.TestCase):
           'text_in': '\\iftrue expected\\else not expected\\fi',
           'true_output': 'expected',
       },
+      # A common(?) misconception is that `\if0 ... \fi` would remove and 
+      # `\if1 ... fi` would retain the enclosed text.
+      # However, `\if<token1><token2> ... \fi` compares <token1> and <token2>,
+      # and based on that, removes or retains the enclosed text
+      # (see Knuth's texbook, Chapter 20, page 208).
       {
           'testcase_name': 'if0_removed',
-          'text_in': '\\if0 to be removed\\fi',
+          'text_in': r'\if0 to be removed\fi',
           'true_output': '',
       },
       {
-          'testcase_name': 'if1 works',
-          'text_in': '\\if 1 expected\\fi',
-          'true_output': 'expected',
+          'testcase_name': 'if0_retained',
+          'text_in': r'\if00 not to be removed\fi',
+          'true_output': ' not to be removed',
+      },
+      {
+          'testcase_name': 'if00 retains blank line',
+          'text_in': 'test\\if00\n\ntest2\\fi',
+          'true_output': 'test\n\ntest2',
+      },
+      {
+          'testcase_name': 'if1_removed',
+          'text_in': r'\if 1 to be removed\fi',
+          'true_output': '',
+      },
+      {
+          'testcase_name': 'if1_retained',
+          'text_in': r'\if 11 not to be removed\fi',
+          'true_output': ' not to be removed',
       },
       {
           'testcase_name': 'new_if_ignored',
@@ -515,6 +540,31 @@ class UnitTests(parameterized.TestCase):
           'text_in': '\\iftrue\\iff\\else\\fi',
           'true_output': '\\iff',
       },
+      {
+            'testcase_name': 'inline conditional block with and without command',
+            'text_in': 'Inline block\\quad\\iftrue with \\fi and \\iftrue without \\fi command in front.',
+            'true_output': 'Inline block\\quad with and without command in front.'
+      },
+      {
+            'testcase_name': 'does not create new blank lines',
+            'text_in': '\\iffalse hidden \\fi\n',
+            'true_output': ''
+      },
+      {
+            'testcase_name': 'does not remove existing blank lines',
+            'text_in': '\\iffalse hidden \\fi\n\n',
+            'true_output': '\n'
+      },
+      {
+            'testcase_name': 'numbers after \\fi are retained.',
+            'text_in': r'\iffalse x\fi1' + '\n',
+            'true_output': '1\n'
+      },
+      {
+            'testcase_name': 'text after conditional is retained even if no newline occurs',
+            'text_in': r'\iffalse x\fi1',
+            'true_output': '1'
+      }
   )
   def test_simplify_conditional_blocks(self, text_in, true_output):
     self.assertEqual(
