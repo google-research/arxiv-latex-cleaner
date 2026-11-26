@@ -26,6 +26,27 @@ pip install arxiv-latex-cleaner
 | :exclamation: arxiv_latex_cleaner is only compatible with Python >=3.9 :exclamation: |
 | ---------------------------------------------------------------------------------- |
 
+With [uv](https://docs.astral.sh/uv/getting-started/installation/), you can
+install the command in an isolated tool environment:
+
+```bash
+uv tool install arxiv-latex-cleaner
+arxiv_latex_cleaner /path/to/latex
+```
+
+If the installed command is not on your `PATH`, run `uv tool update-shell`
+and restart your shell.
+
+For a one-off run without a persistent tool installation, use `uvx`:
+
+```bash
+uvx --from arxiv-latex-cleaner arxiv_latex_cleaner /path/to/latex
+```
+
+The `--from` option specifies the package name, while `arxiv_latex_cleaner`
+is the command it provides. All the usual cleaner arguments can follow the
+command, including `--help`.
+
 If using MacOS, you can install using [Homebrew](https://brew.sh/):
 
 ```bash
