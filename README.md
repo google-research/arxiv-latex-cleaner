@@ -160,7 +160,7 @@ figures are copied to the cleaned output. See
 ## Usage
 
 ```text
-usage: arxiv_latex_cleaner@v1.0.13 [-h] [--resize_images] [--im_size IM_SIZE]
+usage: arxiv_latex_cleaner@v1.1.0 [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
                                    [--images_allowlist IMAGES_ALLOWLIST]
