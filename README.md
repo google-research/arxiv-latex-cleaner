@@ -1,30 +1,38 @@
 # `arxiv_latex_cleaner`
 
-This tool allows you to easily clean the LaTeX code of your paper to submit to
-arXiv. From a folder containing all your code, e.g. `/path/to/latex/`, it
-creates a new folder `/path/to/latex_arXiv/`, that is ready to ZIP and upload to
-arXiv.
+[![Run unit tests](https://github.com/google-research/arxiv-latex-cleaner/actions/workflows/tests.yml/badge.svg)](https://github.com/google-research/arxiv-latex-cleaner/actions/workflows/tests.yml)
+[![PyPI version](https://img.shields.io/pypi/v/arxiv-latex-cleaner.svg)](https://pypi.org/project/arxiv-latex-cleaner/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-## Example call:
+`arxiv_latex_cleaner` cleans the LaTeX source of your paper for submission to
+arXiv. Given a folder (or `.zip` archive) containing your LaTeX project, e.g.
+`/path/to/latex/`, it creates a cleaned copy at `/path/to/latex_arXiv/` ready to
+zip and upload to arXiv.
+
+## Quick start
 
 ```bash
 arxiv_latex_cleaner /path/to/latex --resize_images --im_size 500 --images_allowlist='{"images/im.png":2000}'
 ```
 
-Or simply from a config file
+Or pass a YAML configuration file (see [cleaner_config.yaml](cleaner_config.yaml)):
 
 ```bash
 arxiv_latex_cleaner /path/to/latex --config cleaner_config.yaml
 ```
 
-## Installation:
+## Installation
+
+> [!NOTE]
+> `arxiv_latex_cleaner` requires Python >= 3.9.
+
+### pip
 
 ```bash
 pip install arxiv-latex-cleaner
 ```
 
-| :exclamation: arxiv_latex_cleaner is only compatible with Python >=3.9 :exclamation: |
-| ---------------------------------------------------------------------------------- |
+### uv / uvx
 
 With [uv](https://docs.astral.sh/uv/getting-started/installation/), you can
 install the command in an isolated tool environment:
@@ -34,111 +42,104 @@ uv tool install arxiv-latex-cleaner
 arxiv_latex_cleaner /path/to/latex
 ```
 
-If the installed command is not on your `PATH`, run `uv tool update-shell`
-and restart your shell.
+If the installed command is not on your `PATH`, run `uv tool update-shell` and
+restart your shell.
 
-For a one-off run without a persistent tool installation, use `uvx`:
+For a one-off run without a persistent installation, use `uvx`:
 
 ```bash
 uvx --from arxiv-latex-cleaner arxiv_latex_cleaner /path/to/latex
 ```
 
-The `--from` option specifies the package name, while `arxiv_latex_cleaner`
-is the command it provides. All the usual cleaner arguments can follow the
-command, including `--help`.
+The `--from` option specifies the package name, while `arxiv_latex_cleaner` is
+the command it provides. All standard cleaner arguments can follow the command,
+including `--help`.
 
-If using MacOS, you can install using [Homebrew](https://brew.sh/):
+### Homebrew (macOS)
 
 ```bash
 brew install arxiv_latex_cleaner
 ```
 
-Alternatively, you can download the source code:
+### From source
 
 ```bash
 git clone https://github.com/google-research/arxiv-latex-cleaner
 cd arxiv-latex-cleaner/
+pip install .
+```
+
+Or run directly without installing:
+
+```bash
 python -m arxiv_latex_cleaner --help
 ```
 
-And install as a command-line program directly from the source code:
+## Main features
 
-```bash
-python setup.py install
-```
+### Privacy-oriented
 
-## Main features:
-
-#### Privacy-oriented
-
-*   Removes all auxiliary files (`.aux`, `.log`, `.out`, etc.).
+*   Removes auxiliary build files (`.aux`, `.log`, `.out`, etc.).
 *   Removes AI coding agent config/instruction files so they do not leak into
     the arXiv source (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`,
     `.windsurfrules`, `.claude/`, `.cursor/`, `.github/copilot-instructions.md`,
     and many others). Pass `--keep_agent_files` to keep them.
-*   Removes all comments from your code (yes, those are visible on arXiv and you
-    do not want them to be). These also include `\begin{comment}\end{comment}`,
-    `\iffalse\fi`, and `\if0\fi` environments. A `%` inside `verbatim`,
-    `lstlisting` and `minted` environments is code and stays; other such
-    environments can be named with `verbatim_environments`.
-*   Optionally removes user-defined commands entered with `commands_to_delete`
-    (such as `\todo{}` that you redefine as the empty string at the end).
-*   Optionally allows you to define custom regex replacement rules through a
+*   Removes all LaTeX comments (yes, those are visible on arXiv!). This also
+    handles `\begin{comment}\end{comment}`, `\iffalse\fi`, and `\if0\fi` blocks.
+    A `%` inside `verbatim`, `Verbatim`, `lstlisting`, and `minted` environments
+    is treated as code and preserved; additional environments can be specified
+    with `--verbatim_environments`.
+*   Optionally removes user-defined commands via `--commands_to_delete` (such as
+    `\todo{}`), or removes only the command wrapper while keeping its text via
+    `--commands_only_to_delete`.
+*   Optionally applies custom regex replacement rules defined in a
     `cleaner_config.yaml` file.
 
-#### Size-oriented
+### Size-oriented
 
-There is a 50MB limit on arXiv submissions, so to make it fit:
+arXiv enforces a 50 MB submission limit. To help stay under it, the cleaner:
 
-*   Removes all unused `.tex` files (those that are not in the root and not
-    included in any other `.tex` file).
-*   Removes all unused images that take up space (those that are not actually
-    included in any used `.tex` file).
-*   Optionally resizes all images to `im_size` pixels, to reduce the size of the
-    submission. You can allowlist some images to skip the global size using
-    `images_allowlist`.
-*   Optionally compresses `.pdf` files using ghostscript (Linux and Mac only).
-    You can allowlist some PDFs to skip the global size using
-    `images_allowlist`.
-*   Optionally converts PNG images to JPG format to reduce file size.
+*   Removes unused `.tex` files (files not in the root and not included by any
+    other `.tex` file).
+*   Removes unused images (not referenced in any kept `.tex` file).
+*   Optionally resizes images to `--im_size` pixels (longest side), with
+    per-file overrides via `--images_allowlist`.
+*   Optionally compresses `.pdf` figures using Ghostscript (Linux and macOS
+    only), with per-file DPI overrides via `--images_allowlist`.
+*   Optionally converts PNG images to JPG (`--convert_png_to_jpg`,
+    `--png_quality`, `--png_size_threshold`) and updates the `.tex` references.
 
-#### Merging the TeX files into a single file
+### Merging TeX files into a single file
 
-Sometimes it is useful to submit a single TeX file instead of the whole file
+Sometimes it is useful to submit a single `.tex` file instead of the full folder
 structure, similar to [`latexpand`](https://ctan.org/pkg/latexpand). With
 `--merge_tex_files`, the tool:
 
-*   Recursively replaces the `\input{...}` and `\include{...}` commands in the
-    root `.tex` files with the contents of the files they reference, and does
-    not copy the merged files to the output folder.
-*   Replaces `\include{...}` together with its implicit `\clearpage` commands,
-    so that the compiled document stays the same.
-*   Applies all the other cleaning steps as usual to the merged output. Note
-    that `\includeonly` is not supported.
+*   Recursively replaces `\input{...}` and `\include{...}` commands in root
+    `.tex` files with the contents of the referenced files and omits the merged
+    files from the output folder.
+*   Replaces `\include{...}` together with its implicit `\clearpage` commands so
+    the compiled document remains unchanged.
+*   Applies all other cleaning steps as usual to the merged output. Note that
+    `\includeonly` is not supported.
 
-#### TikZ picture source code concealment
+### TikZ picture source code concealment
 
-To prevent the upload of tikzpicture source code or raw simulation data, this
-feature:
+To avoid uploading `tikzpicture` source code or raw simulation data,
+`--use_external_tikz`:
 
-*   Replaces the tikzpicture environment `\begin{tikzpicture} ...
-    \end{tikzpicture}` with the respective
+*   Replaces `\begin{tikzpicture} ... \end{tikzpicture}` with
     `\includegraphics{EXTERNAL_TIKZ_FOLDER/picture_name.pdf}`.
-*   Requires externally compiled TikZ pictures as `.pdf` files in folder
-    `EXTERNAL_TIKZ_FOLDER`. See section 52 (Externalization Library) in the
-    [PGF/TikZ manual](https://ctan.org/pkg/pgf?lang=en) on TikZ picture
-    externalization.
-*   Only replaces environments with preceding
-    `\tikzsetnextfilename{picture_name}` command (as in
-    `\tikzsetnextfilename{picture_name}\begin{tikzpicture} ...
-    \end{tikzpicture}`) where the externalized `picture_name.pdf` filename
-    matches `picture_name`.
+*   Requires externally compiled `.pdf` figures in `EXTERNAL_TIKZ_FOLDER` (see
+    the Externalization Library section of the
+    [PGF/TikZ manual](https://ctan.org/pkg/pgf?lang=en)).
+*   Only replaces environments preceded by `\tikzsetnextfilename{picture_name}`
+    matching an externalized `picture_name.pdf`.
 
-#### More sophisticated pattern replacement based on regex group captures
+### Custom regex replacements with named capture groups
 
-Sometimes it is useful to work with a set of custom LaTeX commands when writing
-a paper. To get rid of them upon arXiv submission, one can simply revert them to
-plain LaTeX with a regular expression insertion.
+To revert custom LaTeX macros back to plain LaTeX on submission, add regex
+replacement rules to `cleaner_config.yaml`:
 
 ```yaml
 {
@@ -148,20 +149,17 @@ plain LaTeX with a regular expression insertion.
 }
 ```
 
-The pattern above will find all `\figcomp{path}{w1}{w2}` commands and replace
-them with
-`\parbox[c]{w1\linewidth}{\includegraphics[width=w2\linewidth]{figures/path}}`.
-Note that the insertion template is filled with the
-[named groups captures](https://docs.python.org/3/library/re.html#regular-expression-examples)
-from the pattern. Note that the replacement is processed **before** all
-`\includegraphics` commands are processed and corresponding file paths are
-copied, making sure all figure files are copied to the cleaned version. See also
-[cleaner_config.yaml](cleaner_config.yaml) for details on how to specify the
-patterns.
+The rule above replaces `\figcomp{path}{w1}{w2}` with
+`\parbox[c]{w1\linewidth}{\includegraphics[width=w2\linewidth]{figures/path}}`,
+filling the insertion template from
+[named capture groups](https://docs.python.org/3/library/re.html#regular-expression-examples).
+Replacements run **before** `\includegraphics` scanning so all referenced
+figures are copied to the cleaned output. See
+[cleaner_config.yaml](cleaner_config.yaml) for a full example.
 
-## Usage:
+## Usage
 
-```
+```text
 usage: arxiv_latex_cleaner@v1.0.13 [-h] [--resize_images] [--im_size IM_SIZE]
                                    [--compress_pdf]
                                    [--pdf_im_resolution PDF_IM_RESOLUTION]
@@ -185,9 +183,9 @@ Clean the LaTeX code of your paper to submit to arXiv. Check the README for
 more information on the use.
 
 positional arguments:
-  input_folder          Input folder containing the LaTeX code.
+  input_folder          Input folder or zip archive containing the LaTeX code.
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --resize_images       Resize images.
   --im_size IM_SIZE     Size of the output images (in pixels, longest side).
@@ -199,7 +197,7 @@ optional arguments:
                         PDF images.
   --images_allowlist IMAGES_ALLOWLIST
                         Images (and PDFs) that won't be resized to the default
-                        resolution, but the one provided here. Value is pixel
+                        resolution,but the one provided here. Value is pixel
                         for images, and dpi forPDFs, as in --im_size and
                         --pdf_im_resolution, respectively. Format is a
                         dictionary as: '{"path/to/im.jpg": 1000}'
@@ -208,13 +206,13 @@ optional arguments:
                         files (e.g. CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/,
                         .github/copilot-instructions.md). By default these are
                         removed so they do not leak into the arXiv source.
-  --merge_tex_files     Merge the TeX files into a single file, by
-                        recursively replacing the \input and \include
-                        commands in the root TeX files with the contents
-                        of the files they reference; \include is replaced
-                        together with its implicit \clearpage commands.
-                        The merged files are not copied to the output
-                        folder. Note that \includeonly is not supported.
+  --merge_tex_files     Merge the TeX files into a single file, by recursively
+                        replacing the \input and \include commands in the root
+                        TeX files with the contents of the files they
+                        reference; \include is replaced together with its
+                        implicit \clearpage commands. The merged files are not
+                        copied to the output folder. Note that \includeonly is
+                        not supported.
   --commands_to_delete COMMANDS_TO_DELETE [COMMANDS_TO_DELETE ...]
                         LaTeX commands that will be deleted. Useful for e.g.
                         user-defined \todo commands. For example, to delete
@@ -225,37 +223,43 @@ optional arguments:
                         parser does not have any way to know if it's another
                         command to delete.
   --commands_only_to_delete COMMANDS_ONLY_TO_DELETE [COMMANDS_ONLY_TO_DELETE ...]
-                        LaTeX commands that will be deleted but the text 
+                        LaTeX commands that will be deleted but the text
                         wrapped in the commands will be retained. Useful for
                         commands that change text formats and colors, which
-                        you may want to remove but keep the text within. Usages
-                        are exactly the same as commands_to_delete. Note that if
-                        the commands listed here duplicate that after
-                        commands_to_delete, the default action will be retaining
-                        the wrapped text.
+                        you may want to remove but keep the text within.
+                        Usages are exactly the same as commands_to_delete.
+                        Note that if the commands listed here duplicate that
+                        after commands_to_delete, the default action will be
+                        retaining the wrapped text.
   --environments_to_delete ENVIRONMENTS_TO_DELETE [ENVIRONMENTS_TO_DELETE ...]
-                        LaTeX environments that will be deleted. Useful for e.g. 
-                        user-defined comment environments. For example, to 
-                        delete all occurrences of \begin{note} ... \end{note},
-                        run the tool with `--environments_to_delete note`. 
-                        Please note that the positional argument `input_folder`
-                        cannot come immediately after
-                        `environments_to_delete`, as the parser does not have
-                        any way to know if it's another environment to delete.
+                        LaTeX environments that will be deleted. Useful for
+                        e.g. user-defined comment environments. For example,
+                        to delete all occurrences of \begin{note} ...
+                        \end{note}, run the tool with
+                        `--environments_to_delete note`. Please note that the
+                        positional argument `input_folder` cannot come
+                        immediately after `environments_to_delete`, as the
+                        parser does not have any way to know if it's another
+                        environment to delete.
   --verbatim_environments VERBATIM_ENVIRONMENTS [VERBATIM_ENVIRONMENTS ...]
                         LaTeX environments whose content is left alone,
                         comments included, on top of verbatim, Verbatim,
                         lstlisting and minted. Useful for environments that
-                        show code, where a % is part of the code.
+                        show code, where a % is part of the code. Please note
+                        that the positional argument `input_folder` cannot
+                        come immediately after `verbatim_environments`, as the
+                        parser does not have any way to know if it's another
+                        environment.
   --if_exceptions IF_EXCEPTIONS [IF_EXCEPTIONS ...]
-                        Constant TeX primitive conditionals (\iffalse, \iftrue,
-                        etc.) are simplified, i.e., true branches are kept, false
-                        branches deleted. To parse the conditional constructs
-                        correctly, all commands starting with `\if` are assumed to
-                        be TeX primitive conditionals (e.g., declared by
-                        \newif\ifvar). Some known exceptions to this rule are
-                        already included (e.g., \iff, \ifthenelse, etc.), but you
-                        can add custom exceptions using `--if_exceptions iffalt`.
+                        Constant TeX primitive conditionals (\iffalse,
+                        \iftrue, etc.) are simplified, i.e., true branches are
+                        kept, false branches deleted. To parse the conditional
+                        constructs correctly, all commands starting with `\if`
+                        are assumed to be TeX primitive conditionals (e.g.,
+                        declared by \newif\ifvar). Some known exceptions to
+                        this rule are already included (e.g., \iff,
+                        \ifthenelse, etc.), but you can add custom exceptions
+                        using `--if_exceptions iffalt`.
   --use_external_tikz USE_EXTERNAL_TIKZ
                         Folder (relative to input folder) containing
                         externalized tikz figures in PDF format.
@@ -267,14 +271,17 @@ optional arguments:
                         `.pdf_tex` files. By default, these files and the
                         generated PDFs are located under `./svg-inkscape`
                         (relative to the input folder), but a different path
-                        (relative to the input folder) can be provided in case a
-                        different `inkscapepath` was set when loading the `svg`
-                        package.
-  --convert_png_to_jpg  Convert PNG images to JPG format to reduce file size
+                        (relative to the input folder) can be provided in case
+                        a different `inkscapepath` was set when loading the
+                        `svg` package.
+  --convert_png_to_jpg  Convert PNG images to JPG format to reduce file size.
+                        Note that this will override --resize_images for PNG
+                        files.
   --png_quality PNG_QUALITY
                         JPG quality for PNG conversion (0-100, default: 50)
   --png_size_threshold PNG_SIZE_THRESHOLD
-                        Minimum PNG file size in MB to apply quality reduction (default: 0.5)
+                        Minimum PNG file size in MB to apply quality reduction
+                        (default: 0.5)
   --config CONFIG       Read settings from `.yaml` config file. If command
                         line arguments are provided additionally, the config
                         file parameters are updated with the command line
@@ -282,10 +289,13 @@ optional arguments:
   --verbose             Enable detailed output.
 ```
 
-## Testing:
+## Testing
+
+Install the test dependencies and run the full test suite:
 
 ```bash
-python -m unittest arxiv_latex_cleaner.tests.arxiv_latex_cleaner_test
+pip install -r requirements.txt absl-py
+python -m unittest discover -s arxiv_latex_cleaner/tests -p "*_test.py" -v
 ```
 
 ## Note
