@@ -61,7 +61,7 @@ class ConditionalEdgeCasesTest(parameterized.TestCase):
       self, text, expected_warning
   ):
     stderr_buf = io.StringIO()
-    with mock.patch.object(os.sys, 'stderr', stderr_buf):
+    with mock.patch.object(sys, 'stderr', stderr_buf):
       output = cleaner._simplify_conditional_blocks(text)
     self.assertEqual(output, text)
     self.assertIn(expected_warning, stderr_buf.getvalue())
@@ -100,6 +100,23 @@ class CommentsAndStrippingEdgeCasesTest(unittest.TestCase):
     text = 'Hello\n% \\begin{verbatim}\n% \\end{verbatim}'
     self.assertEqual(cleaner._remove_comments(text), 'Hello\n')
 
+  def test_verbatim_after_double_backslash_percent_is_commented_out(self):
+    text = (
+        'Line break \\\\% \\begin{verbatim}\n'
+        'normal % comment to strip\n'
+        '\\begin{verbatim}\n'
+        'code % keep me\n'
+        '\\end{verbatim}\n'
+    )
+    expected = (
+        'Line break \\\\%\n'
+        'normal %\n'
+        '\\begin{verbatim}\n'
+        'code % keep me\n'
+        '\\end{verbatim}\n'
+    )
+    self.assertEqual(cleaner._remove_comments(text), expected)
+
   def test_strip_tex_contents_with_comment_after_end_document(self):
     lines = [
         '\\begin{document}\n',
@@ -123,8 +140,7 @@ class ImageAndPdfProcessingTest(unittest.TestCase):
       dst.mkdir()
       (src / 'corrupt.png').write_bytes(b'not a valid png image')
 
-      stdout_buf = io.StringIO()
-      with mock.patch.object(sys, 'stdout', stdout_buf):
+      with self.assertLogs(level='WARNING') as logs:
         out = cleaner._resize_and_copy_figure(
             filename='corrupt.png',
             origin_folder=str(src),
@@ -139,6 +155,56 @@ class ImageAndPdfProcessingTest(unittest.TestCase):
       self.assertEqual(
           (dst / 'corrupt.png').read_bytes(), b'not a valid png image'
       )
+      self.assertTrue(any('Failed to process image' in m for m in logs.output))
+
+  def test_png_to_jpg_corrupt_png_falls_back_to_copy(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      src = Path(tmp) / 'src'
+      dst = Path(tmp) / 'dst'
+      src.mkdir()
+      dst.mkdir()
+      (src / 'bad.png').write_bytes(b'corrupt png data')
+
+      with self.assertLogs(level='WARNING') as logs:
+        out = cleaner._resize_and_copy_figure(
+            filename='bad.png',
+            origin_folder=str(src),
+            destination_folder=str(dst),
+            resize_image=False,
+            image_size=100,
+            compress_pdf=False,
+            pdf_resolution=150,
+            convert_png_to_jpg=True,
+        )
+      self.assertEqual(out, 'bad.png')
+      self.assertEqual((dst / 'bad.png').read_bytes(), b'corrupt png data')
+      self.assertTrue(any('Failed to convert PNG' in m for m in logs.output))
+
+  def test_png_to_jpg_transparent_rgba_composites_onto_white(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      src = Path(tmp) / 'src'
+      dst = Path(tmp) / 'dst'
+      src.mkdir()
+      dst.mkdir()
+      rgba = Image.new('RGBA', (16, 16), color=(0, 0, 0, 0))
+      rgba.save(src / 'transparent.png', 'PNG')
+
+      out = cleaner._resize_and_copy_figure(
+          filename='transparent.png',
+          origin_folder=str(src),
+          destination_folder=str(dst),
+          resize_image=False,
+          image_size=100,
+          compress_pdf=False,
+          pdf_resolution=150,
+          convert_png_to_jpg=True,
+          png_quality=100,
+      )
+      self.assertEqual(out, 'transparent.jpg')
+      with Image.open(dst / 'transparent.jpg') as converted:
+        pixel = converted.getpixel((8, 8))
+        # White background (not black (0, 0, 0)).
+        self.assertGreater(min(pixel), 240)
 
   def test_png_to_jpg_verbose_small_and_large_threshold(self):
     with tempfile.TemporaryDirectory() as tmp:
@@ -150,8 +216,7 @@ class ImageAndPdfProcessingTest(unittest.TestCase):
       img.save(src / 'sample.png', 'PNG')
 
       # Small PNG (below threshold -> quality 100)
-      stdout_small = io.StringIO()
-      with mock.patch.object(sys, 'stdout', stdout_small):
+      with self.assertLogs(level='INFO') as logs_small:
         out_small = cleaner._resize_and_copy_figure(
             filename='sample.png',
             origin_folder=str(src),
@@ -166,12 +231,13 @@ class ImageAndPdfProcessingTest(unittest.TestCase):
             verbose=True,
         )
       self.assertEqual(out_small, 'sample.jpg')
-      self.assertIn('Keeping original quality', stdout_small.getvalue())
+      self.assertTrue(
+          any('Keeping original quality' in m for m in logs_small.output)
+      )
       self.assertTrue((dst / 'sample.jpg').exists())
 
       # Large PNG (above threshold -> configured quality)
-      stdout_large = io.StringIO()
-      with mock.patch.object(sys, 'stdout', stdout_large):
+      with self.assertLogs(level='INFO') as logs_large:
         out_large = cleaner._resize_and_copy_figure(
             filename='sample.png',
             origin_folder=str(src),
@@ -186,7 +252,7 @@ class ImageAndPdfProcessingTest(unittest.TestCase):
             verbose=True,
         )
       self.assertEqual(out_large, 'sample.jpg')
-      self.assertIn('quality 75', stdout_large.getvalue())
+      self.assertTrue(any('quality 75' in m for m in logs_large.output))
 
   def test_update_image_references_noop_and_extensionless_and_list(self):
     # No-op when filename unchanged
@@ -196,18 +262,17 @@ class ImageAndPdfProcessingTest(unittest.TestCase):
     )
     self.assertEqual(contents['main.tex'], '\\includegraphics{fig.png}\n')
 
-    # Extensionless reference (Pattern 2) with list-format content + verbose
+    # Extensionless reference (Pattern 2) with list-format content + logging
     list_contents = {
         'main.tex': ['\\begin{figure}\n', '\\includegraphics{images/fig}\n']
     }
-    stdout_buf = io.StringIO()
-    with mock.patch.object(sys, 'stdout', stdout_buf):
+    with self.assertLogs(level='INFO') as logs:
       updated = cleaner._update_image_references(
           list_contents, 'images/fig.png', 'images/fig.jpg', verbose=True
       )
     self.assertIsInstance(updated['main.tex'], list)
     self.assertIn('images/fig.jpg', '\n'.join(updated['main.tex']))
-    self.assertIn('Applied pattern 2', stdout_buf.getvalue())
+    self.assertTrue(any('Applied pattern 2' in m for m in logs.output))
 
   def test_resize_pdf_figure_handles_timeout(self):
     fake_proc = mock.MagicMock()
@@ -310,14 +375,15 @@ class FileHandlingAndMergeEdgeCasesTest(unittest.TestCase):
       params['convert_png_to_jpg'] = True
       params['verbose'] = True
 
-      stdout_buf = io.StringIO()
-      with mock.patch.object(sys, 'stdout', stdout_buf):
+      with self.assertLogs(level='INFO') as logs:
         cleaner.run_arxiv_cleaner(params)
 
       out_dir = Path(str(src) + '_arXiv')
       self.assertTrue((out_dir / 'pic.jpg').exists())
       self.assertIn('pic.jpg', (out_dir / 'main.tex').read_text('utf-8'))
-      self.assertIn('Updated 1 image references', stdout_buf.getvalue())
+      self.assertTrue(
+          any('Updated 1 image references' in m for m in logs.output)
+      )
 
 
 class CliEndToEndTest(unittest.TestCase):

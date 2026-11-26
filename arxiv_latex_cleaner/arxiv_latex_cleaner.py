@@ -23,6 +23,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 from typing import List, Optional
 
@@ -264,7 +265,7 @@ def _remove_environment(text, environment):
   )
 
 
-def _simplify_conditional_blocks(text, if_exceptions=[]):
+def _simplify_conditional_blocks(text, if_exceptions=None):
   r"""Simplify possibly nested conditional blocks from 'text'.
 
   For example, `\iffalse TEST1\else TEST2\fi` is simplified to `TEST2`,
@@ -332,7 +333,7 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
       'ifpdfstringunicode',
       # package ifthen
       'ifthenelse',
-  ] + if_exceptions
+  ] + list(if_exceptions or ())
 
   @dataclasses.dataclass
   class TokenRange:
@@ -382,17 +383,17 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
   def _parse_conditional_tree() -> Optional[ConditionNode]:
 
     def print_abort(error_finding, tree):
-      os.sys.stderr.write(
+      sys.stderr.write(
           f'Warning: Found {error_finding}! Not removing any conditional'
           ' blocks...\n'
       )
-      os.sys.stderr.write(
-          f'         This is the matched tree (as built up to the error):\n'
+      sys.stderr.write(
+          '         This is the matched tree (as built up to the error):\n'
       )
-      tree.print(indent=9, write=os.sys.stderr.write)
-      os.sys.stderr.write(
-          f'         Potentially, you need to supply an exception using'
-          f" --if_exceptions'.\n"
+      tree.print(indent=9, write=sys.stderr.write)
+      sys.stderr.write(
+          '         Potentially, you need to supply an exception using'
+          " --if_exceptions'.\n"
       )
 
     toplevel_tree = ConditionNode(NodeKind.TOPLEVEL)
@@ -546,6 +547,18 @@ def _simplify_conditional_blocks(text, if_exceptions=[]):
 VERBATIM_ENVIRONMENTS = ['verbatim', 'Verbatim', 'lstlisting', 'minted']
 
 
+def _find_unescaped_percent(text):
+  r"""Returns the first match of an unescaped '%' in 'text', or None.
+
+  A '%' preceded by an odd number of backslashes (e.g. '\%') is escaped; an
+  even number (e.g. '\\%', line break + comment) starts a comment.
+  """
+  for match in regex.finditer(r'\\*%', text):
+    if (len(match[0]) - 1) % 2 == 0:
+      return match
+  return None
+
+
 def _remove_comments_inline(text):
   """Removes the comments from the string 'text' and ignores % inside \\url{}."""
   auto_ignore_pattern = r'(%\s*auto-ignore).*'
@@ -561,14 +574,9 @@ def _remove_comments_inline(text):
     """Check if a segment of text contains a comment and remove it."""
     if segment.lstrip().startswith('%'):
       return '', True
-    # Do not match \% (as this is the escaped percent symbol),
-    # but do match `\\%` (break line + start of comment).
-    for match in regex.finditer(r'\\*%', segment):
-      # If there are an odd number of backslashes, the percent char is escaped,
-      # otherwise the percent char is the beginning of a comment.
-      if (len(match[0]) - 1) % 2 == 0:
-        return segment[: match.end()] + '\n', True
-    
+    match = _find_unescaped_percent(segment)
+    if match is not None:
+      return segment[: match.end()] + '\n', True
     return segment, False
 
   # split the text into segments based on \url{} tags
@@ -618,9 +626,9 @@ def _remove_comments_from_lines(text, continues_line=False):
 
 
 def _is_commented_out(text, position):
-  """Says whether 'position' in 'text' comes after a % on its own line."""
+  """Says whether 'position' in 'text' comes after an unescaped % on its line."""
   line_start = text.rfind('\n', 0, position) + 1
-  return regex.search(r'(?<!\\)%', text[line_start:position]) is not None
+  return _find_unescaped_percent(text[line_start:position]) is not None
 
 
 def _find_verbatim_environments(text, environments):
@@ -765,6 +773,18 @@ def _replace_includesvg(content, svg_inkscape_files):
 
   return content
 
+def _convert_image_to_rgb(im):
+  """Converts a PIL Image to RGB, compositing transparency onto white."""
+  if im.mode in ('RGBA', 'LA') or (
+      im.mode == 'P' and 'transparency' in im.info
+  ):
+    rgba = im.convert('RGBA')
+    background = Image.new('RGB', rgba.size, (255, 255, 255))
+    background.paste(rgba, mask=rgba.getchannel('A'))
+    return background
+  return im.convert('RGB')
+
+
 def _resize_and_copy_figure(
     filename,
     origin_folder,
@@ -776,167 +796,178 @@ def _resize_and_copy_figure(
     convert_png_to_jpg=False,
     png_quality=50,
     png_size_threshold=0.5,
-    verbose=False
+    verbose=False,
 ):
-    """Resizes and copies the input figure (either JPG, PNG, or PDF).
+  """Resizes and copies the input figure (either JPG, PNG, or PDF).
 
-    Parameters:
-        filename: The input filename
-        origin_folder: The folder containing the input filename
-        destination_folder: The folder to copy the output filename to
-        resize_image: Whether to resize the image
-        image_size: The maximum size of the image in pixels
-        compress_pdf: Whether to compress the PDF file
-        convert_png_to_jpg: Whether to convert PNG files to JPG format. Note that this will override resize_image for PNG files.
-        png_quality: JPG quality for converted PNG files (0-100)
-        png_size_threshold: Minimum file size in MB to apply quality reduction
-        verbose: Enable verbose logging
-    
-    Returns:
-        str: The actual output filename (may differ from input if PNG was converted)
-    """
-    _create_dir_if_not_exists(
-        os.path.join(destination_folder, os.path.dirname(filename))
-    )
-    
-    if convert_png_to_jpg and os.path.splitext(filename)[1].lower() in ['.png']:
-        original_size_mb = os.path.getsize(os.path.join(origin_folder, filename)) / (1024 * 1024)
-        im = Image.open(os.path.join(origin_folder, filename))
-        # Determine quality based on file size
+  Args:
+    filename: The input filename.
+    origin_folder: The folder containing the input filename.
+    destination_folder: The folder to copy the output filename to.
+    resize_image: Whether to resize the image.
+    image_size: The maximum size of the image in pixels.
+    compress_pdf: Whether to compress the PDF file.
+    pdf_resolution: Resolution (in dpi) for compressed PDFs.
+    convert_png_to_jpg: Whether to convert PNG files to JPG format. Note that
+      this overrides resize_image for PNG files.
+    png_quality: JPG quality for converted PNG files (0-100).
+    png_size_threshold: Minimum file size in MB to apply quality reduction.
+    verbose: Unused (retained for backwards compatibility; use logging level).
+
+  Returns:
+    The actual output filename (may differ from input if PNG was converted).
+  """
+  del verbose  # Handled via logging level.
+  _create_dir_if_not_exists(
+      os.path.join(destination_folder, os.path.dirname(filename))
+  )
+  src_path = os.path.join(origin_folder, filename)
+  ext = os.path.splitext(filename)[1].lower()
+
+  if convert_png_to_jpg and ext == '.png':
+    try:
+      original_size_mb = os.path.getsize(src_path) / (1024 * 1024)
+      with Image.open(src_path) as im:
         if original_size_mb < png_size_threshold:
-            quality = 100  # Keep high quality for small files
-            if verbose:
-                print(f"Keeping original quality for small PNG: {filename}")
+          quality = 100  # Keep high quality for small files.
+          logging.info('Keeping original quality for small PNG: %s', filename)
         else:
-            quality = png_quality
-            if verbose:
-                print(f"Converting PNG to JPG with quality {quality}: {filename}")
-        
-        # Convert PNG to JPG
+          quality = png_quality
+          logging.info(
+              'Converting PNG to JPG with quality %d: %s', quality, filename
+          )
+
         output_filename = os.path.splitext(filename)[0] + '.jpg'
-        rgb_img = im.convert('RGB')
-        rgb_img.save(os.path.join(destination_folder, output_filename), 'JPEG', quality=quality)
-        
-        if verbose:
-            print(f"Converted: {filename} -> {output_filename}")
-          
+        rgb_img = _convert_image_to_rgb(im)
+        rgb_img.save(
+            os.path.join(destination_folder, output_filename),
+            'JPEG',
+            quality=quality,
+        )
+        logging.info('Converted: %s -> %s', filename, output_filename)
         return output_filename
-                    
-    if resize_image and os.path.splitext(filename)[1].lower() in [
-        '.jpg',
-        '.jpeg',
-        '.png',
-    ]:
-        try:
-            im = Image.open(os.path.join(origin_folder, filename))
-            if max(im.size) > image_size:
-                im = im.resize(
-                    tuple([int(x * float(image_size) / max(im.size)) for x in im.size]),
-                    Image.Resampling.LANCZOS,
-                )
-            
-            if os.path.splitext(filename)[1].lower() in ['.jpg', '.jpeg']:
-                im.save(os.path.join(destination_folder, filename), 'JPEG', quality=90)
-                return filename
-                
-            elif os.path.splitext(filename)[1].lower() in ['.png']:
-                im.save(os.path.join(destination_folder, filename), 'PNG')
-                return filename
-                    
-        except Exception as e:
-            if verbose:
-                print(f"Failed to process image {filename}: {e}")
-            # Fall back to simple copy
-            shutil.copy(
-                os.path.join(origin_folder, filename),
-                os.path.join(destination_folder, filename),
-            )
-            return filename
+    except Exception as e:
+      logging.warning(
+          'Failed to convert PNG %s to JPG (%s); copying original.', filename, e
+      )
+      shutil.copy(src_path, os.path.join(destination_folder, filename))
+      return filename
 
-    elif compress_pdf and os.path.splitext(filename)[1].lower() == '.pdf':
-        _resize_pdf_figure(
-            filename, origin_folder, destination_folder, pdf_resolution
-        )
-        return filename
+  if resize_image and ext in ('.jpg', '.jpeg', '.png'):
+    try:
+      with Image.open(src_path) as im:
+        if max(im.size) > image_size:
+          im = im.resize(
+              tuple(int(x * float(image_size) / max(im.size)) for x in im.size),
+              Image.Resampling.LANCZOS,
+          )
+        if ext in ('.jpg', '.jpeg'):
+          im.save(
+              os.path.join(destination_folder, filename), 'JPEG', quality=90
+          )
+          return filename
+        if ext == '.png':
+          im.save(os.path.join(destination_folder, filename), 'PNG')
+          return filename
+    except Exception as e:
+      logging.warning(
+          'Failed to process image %s (%s); copying original.', filename, e
+      )
+      shutil.copy(src_path, os.path.join(destination_folder, filename))
+      return filename
+
+  if compress_pdf and ext == '.pdf':
+    _resize_pdf_figure(
+        filename, origin_folder, destination_folder, pdf_resolution
+    )
+    return filename
+
+  shutil.copy(src_path, os.path.join(destination_folder, filename))
+  return filename
+
+
+def _update_image_references(
+    tex_contents_dict, old_filename, new_filename, verbose=False
+):
+  """Updates references from old_filename to new_filename in all tex content."""
+  del verbose  # Handled via logging level.
+  if old_filename == new_filename:
+    return  # No change needed
+
+  old_base = os.path.splitext(old_filename)[0]
+  new_base = os.path.splitext(new_filename)[0]
+
+  logging.info('Updating LaTeX references: %s -> %s', old_filename, new_filename)
+
+  for tex_file in tex_contents_dict:
+    # Handle both string and list content.
+    if isinstance(tex_contents_dict[tex_file], list):
+      content = ''.join(tex_contents_dict[tex_file])
     else:
-        shutil.copy(
-            os.path.join(origin_folder, filename),
-            os.path.join(destination_folder, filename),
+      content = tex_contents_dict[tex_file]
+
+    content_changed = False
+
+    # Pattern 1: Direct filename with full extension, handling comments/newlines.
+    pattern1 = (
+        r'(\{(?:%\s*\n\s*)?[^}]*?)'
+        + regex.escape(old_filename)
+        + r'((?:%\s*\n\s*)?[^}]*?\})'
+    )
+    replacement1 = r'\1' + new_filename + r'\2'
+
+    new_content = regex.sub(
+        pattern1, replacement1, content, flags=regex.IGNORECASE | regex.DOTALL
+    )
+    if new_content != content:
+      content = new_content
+      content_changed = True
+      logging.info('Applied pattern 1 (full filename) in %s', tex_file)
+    else:
+      # Pattern 2: Base filename without extension, handling comments/newlines.
+      # Only apply if Pattern 1 didn't match to avoid double replacements.
+      pattern2 = (
+          r'(\{(?:%\s*\n\s*)?[^}]*?)'
+          + regex.escape(old_base)
+          + r'((?:%\s*\n\s*)?[^}]*?\})'
+      )
+      replacement2 = r'\1' + new_base + r'.jpg\2'
+
+      new_content = regex.sub(
+          pattern2, replacement2, content, flags=regex.IGNORECASE | regex.DOTALL
+      )
+      if new_content != content:
+        content = new_content
+        content_changed = True
+        logging.info('Applied pattern 2 (base filename) in %s', tex_file)
+      else:
+        # Pattern 3: Extension split across lines with comments (e.g. name%\n.png).
+        pattern3 = (
+            r'(\{[^}]*?)'
+            + regex.escape(old_base)
+            + r'(%\s*\n\s*)(\.png)([^}]*?\})'
         )
-        return filename
+        replacement3 = r'\1' + new_base + r'\2.jpg\4'
 
-
-def _update_image_references(tex_contents_dict, old_filename, new_filename, verbose=False):
-    """Update references from old_filename to new_filename in all tex content."""
-    if old_filename == new_filename:
-        return  # No change needed
-    
-    old_base = os.path.splitext(old_filename)[0]
-    new_base = os.path.splitext(new_filename)[0]
-    
-    if verbose:
-        print(f"Updating LaTeX references: {old_filename} -> {new_filename}")
-    
-    for tex_file in tex_contents_dict:
-        # Handle both string and list content
-        if isinstance(tex_contents_dict[tex_file], list):
-            content = ''.join(tex_contents_dict[tex_file])
-        else:
-            content = tex_contents_dict[tex_file]
-        
-        content_changed = False
-        
-        # Pattern 1: Direct filename with full extension, handling comments and newlines
-        pattern1 = r'(\{(?:%\s*\n\s*)?[^}]*?)' + regex.escape(old_filename) + r'((?:%\s*\n\s*)?[^}]*?\})'
-        replacement1 = r'\1' + new_filename + r'\2'
-        
-        new_content = regex.sub(pattern1, replacement1, content, flags=regex.IGNORECASE | regex.DOTALL)
+        new_content = regex.sub(
+            pattern3,
+            replacement3,
+            content,
+            flags=regex.IGNORECASE | regex.DOTALL,
+        )
         if new_content != content:
-            content = new_content
-            content_changed = True
-            if verbose:
-                print(f"Applied pattern 1 (full filename) in {tex_file}")
-        else:
-            # Pattern 2: Base filename without extension, handling comments and newlines
-            # Only apply this if Pattern 1 didn't match to avoid double replacements
-            pattern2 = r'(\{(?:%\s*\n\s*)?[^}]*?)' + regex.escape(old_base) + r'((?:%\s*\n\s*)?[^}]*?\})'
-            replacement2 = r'\1' + new_base + r'.jpg\2'
-            
-            new_content = regex.sub(pattern2, replacement2, content, flags=regex.IGNORECASE | regex.DOTALL)
-            if new_content != content:
-                content = new_content
-                content_changed = True
-                if verbose:
-                    print(f"Applied pattern 2 (base filename) in {tex_file}")
-            else:
-                # Pattern 3: Handle cases where extension is split across lines with comments
-                # This specifically targets patterns like: images/filename%\n.png
-                pattern3 = r'(\{[^}]*?)' + regex.escape(old_base) + r'(%\s*\n\s*)(\.png)([^}]*?\})'
-                replacement3 = r'\1' + new_base + r'\2.jpg\4'
-                
-                new_content = regex.sub(pattern3, replacement3, content, flags=regex.IGNORECASE | regex.DOTALL)
-                if new_content != content:
-                    content = new_content
-                    content_changed = True
-                    if verbose:
-                        print(f"Applied pattern 3 (split extension) in {tex_file}")
-        
-        # Update the content back in the appropriate format
-        if content_changed:
-            if isinstance(tex_contents_dict[tex_file], list):
-                # Convert back to list format, preserving line endings
-                tex_contents_dict[tex_file] = content.split('\n')
-            else:
-                tex_contents_dict[tex_file] = content
-            
-            if verbose:
-                print(f"Updated references in {tex_file}")
-    
-    # Re-write the updated tex files to the output directory
-    if verbose and any(tex_contents_dict.values()):
-        print("Re-writing updated tex files...")
-    
-    return tex_contents_dict
+          content = new_content
+          content_changed = True
+          logging.info('Applied pattern 3 (split extension) in %s', tex_file)
+
+    if content_changed:
+      if isinstance(tex_contents_dict[tex_file], list):
+        tex_contents_dict[tex_file] = content.split('\n')
+      else:
+        tex_contents_dict[tex_file] = content
+      logging.info('Updated references in %s', tex_file)
+
+  return tex_contents_dict
 
 
 def _resize_pdf_figure(
@@ -1437,33 +1468,35 @@ def run_arxiv_cleaner(parameters):
     )
     logging.info('Outputs written to %s', parameters['output_folder'])
 
-    # Update LaTeX references for changed filenames if tex_contents_dict is provided
+    # Update LaTeX references for changed filenames if tex_contents is provided.
     if tex_contents and filename_changes:
-        for old_filename, new_filename in filename_changes.items():
-            tex_contents = _update_image_references(
-                tex_contents, old_filename, new_filename, 
-                verbose=parameters.get('verbose', False)
-            )
+      for old_filename, new_filename in filename_changes.items():
+        tex_contents = _update_image_references(
+            tex_contents,
+            old_filename,
+            new_filename,
+            verbose=parameters.get('verbose', False),
+        )
 
-        # Re-write modified tex files with new references after resizing and copying figures
-        for tex_file in splits['tex_to_copy']:
-            if tex_file in tex_contents:
-                # Get the updated content
-                if isinstance(tex_contents[tex_file], list):
-                    updated_content = ''.join(tex_contents[tex_file])
-                else:
-                    updated_content = tex_contents[tex_file]
-                
-                # Write the updated content back to the output file
-                output_path = os.path.join(parameters['output_folder'], tex_file)
-                logging.info('Re-writing modified tex file with updated references: %s', output_path)
-                _write_file_content(updated_content, output_path)
-                
-                if parameters.get('verbose', False):
-                    print(f"Re-wrote {tex_file} with updated image references")
-        
-        if parameters.get('verbose', False):
-            print(f"Updated {len(filename_changes)} image references and re-wrote tex files")
+      # Re-write modified tex files with new references after converting figures.
+      for tex_file in splits['tex_to_copy']:
+        if tex_file in tex_contents:
+          if isinstance(tex_contents[tex_file], list):
+            updated_content = ''.join(tex_contents[tex_file])
+          else:
+            updated_content = tex_contents[tex_file]
+
+          output_path = os.path.join(parameters['output_folder'], tex_file)
+          logging.info(
+              'Re-writing modified tex file with updated references: %s',
+              output_path,
+          )
+          _write_file_content(updated_content, output_path)
+
+      logging.info(
+          'Updated %d image references and re-wrote tex files.',
+          len(filename_changes),
+      )
 
 
 def strip_whitespace(text):
