@@ -167,7 +167,7 @@ PARSER.add_argument(
     help=(
         "LaTeX environments whose content is left alone, comments included, "
         "on top of verbatim, Verbatim, lstlisting and minted. Useful for "
-        "environments that show code, where a % is part of the code. Please "
+        "environments that show code, where a %% is part of the code. Please "
         "note that the positional argument `input_folder` cannot come "
         "immediately after `verbatim_environments`, as the parser does not "
         "have any way to know if it's another environment."
