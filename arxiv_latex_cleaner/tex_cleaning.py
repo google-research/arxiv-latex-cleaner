@@ -406,6 +406,11 @@ def _remove_comments_inline(text):
   if regex.search(auto_ignore_pattern, text):
     return regex.sub(auto_ignore_pattern, r'\1', text)
 
+  # Preserve TeX/BibTeX magic directives such as '% !BIB program = biber' or
+  # '% !TeX program = pdflatex'.
+  if regex.match(r'^\s*%\s*!(?:BIB|TeX)\b', text, flags=regex.IGNORECASE):
+    return text
+
   if text.lstrip().startswith('%'):
     return ''
 

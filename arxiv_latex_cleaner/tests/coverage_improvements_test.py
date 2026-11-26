@@ -96,6 +96,16 @@ class CommentsAndStrippingEdgeCasesTest(unittest.TestCase):
         r'See \url{https://example.com/a%20b}' + '\n',
     )
 
+  def test_magic_bib_and_tex_comments_are_preserved(self):
+    for directive in (
+        '% !BIB program = biber\n',
+        '% !TeX program = pdflatex\n',
+        '%!BIB TS-program = biber\n',
+    ):
+      self.assertEqual(cleaner._remove_comments_inline(directive), directive)
+    # Regular comments starting with '!' without BIB/TeX are still removed.
+    self.assertEqual(cleaner._remove_comments_inline('% !regular comment\n'), '')
+
   def test_commented_out_verbatim_on_last_line_without_newline(self):
     text = 'Hello\n% \\begin{verbatim}\n% \\end{verbatim}'
     self.assertEqual(cleaner._remove_comments(text), 'Hello\n')
@@ -384,6 +394,42 @@ class FileHandlingAndMergeEdgeCasesTest(unittest.TestCase):
       self.assertTrue(
           any('Updated 1 image references' in m for m in logs.output)
       )
+
+  def test_anc_folder_is_preserved_verbatim_excluding_junk(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      src = Path(tmp) / 'paper'
+      src.mkdir()
+      (src / 'main.tex').write_text(
+          '\\documentclass{article}\n'
+          '\\begin{document}\n'
+          'Hello.\n'
+          '\\end{document}\n',
+          encoding='utf-8',
+      )
+      anc_dir = src / 'anc'
+      anc_sub = anc_dir / 'data'
+      anc_sub.mkdir(parents=True)
+      (anc_dir / 'README.txt').write_text('ancillary readme\n', encoding='utf-8')
+      (anc_sub / 'results.csv').write_text('a,b\n1,2\n', encoding='utf-8')
+      (anc_dir / 'script.py').write_text('# comment kept\n', encoding='utf-8')
+      (anc_dir / '.DS_Store').write_bytes(b'junk')
+
+      cleaner.run_arxiv_cleaner(self._base_params(src))
+
+      out_dir = Path(str(src) + '_arXiv')
+      self.assertEqual(
+          (out_dir / 'anc' / 'README.txt').read_text('utf-8'),
+          'ancillary readme\n',
+      )
+      self.assertEqual(
+          (out_dir / 'anc' / 'data' / 'results.csv').read_text('utf-8'),
+          'a,b\n1,2\n',
+      )
+      self.assertEqual(
+          (out_dir / 'anc' / 'script.py').read_text('utf-8'),
+          '# comment kept\n',
+      )
+      self.assertFalse((out_dir / 'anc' / '.DS_Store').exists())
 
 
 class CliEndToEndTest(unittest.TestCase):

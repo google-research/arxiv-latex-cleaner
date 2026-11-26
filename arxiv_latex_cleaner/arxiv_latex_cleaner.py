@@ -194,6 +194,10 @@ def run_arxiv_cleaner(parameters):
       logging.info('Copying non-tex file %s.', non_tex_file)
       _copy_file(non_tex_file, parameters)
 
+    for anc_file in splits['anc_files']:
+      logging.info('Copying ancillary file %s.', anc_file)
+      _copy_file(anc_file, parameters)
+
     filename_changes = _resize_and_copy_figures_if_referenced(
         parameters, full_content, splits, tex_contents=tex_contents
     )

@@ -339,16 +339,23 @@ def _split_all_files(parameters):
   file_splits['not_in_root'] = [
       f for f in file_splits['all'] if f not in file_splits['in_root']
   ]
+  # Preserve arXiv's anc/ ancillary files folder verbatim (excluding deleted junk).
+  file_splits['anc_files'] = _remove_pattern(
+      _keep_pattern(file_splits['not_in_root'], [r'^anc/']),
+      parameters['to_delete'],
+  )
+  non_anc_not_in_root = _remove_pattern(file_splits['not_in_root'], [r'^anc/'])
   file_splits['to_copy_in_root'] = _remove_pattern(
       file_splits['in_root'],
       parameters['to_delete'] + parameters['figures_to_copy_if_referenced'],
   )
   file_splits['to_copy_not_in_root'] = _remove_pattern(
-      file_splits['not_in_root'],
+      non_anc_not_in_root,
       parameters['to_delete'] + parameters['figures_to_copy_if_referenced'],
   )
   file_splits['figures'] = _keep_pattern(
-      file_splits['all'], parameters['figures_to_copy_if_referenced']
+      file_splits['in_root'] + non_anc_not_in_root,
+      parameters['figures_to_copy_if_referenced'],
   )
 
   file_splits['tex_in_root'] = _keep_pattern(
