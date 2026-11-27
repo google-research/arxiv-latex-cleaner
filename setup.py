@@ -43,7 +43,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     entry_points={
-        "console_scripts": ["arxiv_latex_cleaner=arxiv_latex_cleaner.__main__:__main__"]
+        "console_scripts": ["arxiv_latex_cleaner=arxiv_latex_cleaner.__main__:main"]
     },
     install_requires=install_requires,
     classifiers=[
