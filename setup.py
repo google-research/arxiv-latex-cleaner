@@ -34,7 +34,7 @@ setup(
     name="arxiv_latex_cleaner",
     version=__version__,
     packages=find_packages(exclude=["*.tests"]),
-    python_requires='>=3',
+    python_requires='>=3.9',
     url="https://github.com/google-research/arxiv-latex-cleaner",
     license="Apache License, Version 2.0",
     author="Google Research Authors",
@@ -43,7 +43,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     entry_points={
-        "console_scripts": ["arxiv_latex_cleaner=arxiv_latex_cleaner.__main__:__main__"]
+        "console_scripts": ["arxiv_latex_cleaner=arxiv_latex_cleaner.__main__:main"]
     },
     install_requires=install_requires,
     classifiers=[

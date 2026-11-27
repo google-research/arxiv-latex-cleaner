@@ -91,6 +91,30 @@ PARSER.add_argument(
 )
 
 PARSER.add_argument(
+    "--keep_agent_files",
+    action="store_true",
+    help=(
+        "Avoid deleting AI coding agent config/instruction files (e.g. "
+        "CLAUDE.md, AGENTS.md, GEMINI.md, .cursor/, .github/copilot-"
+        "instructions.md). By default these are removed so they do not leak "
+        "into the arXiv source."
+    ),
+)
+
+PARSER.add_argument(
+    "--merge_tex_files",
+    action="store_true",
+    help=(
+        "Merge the TeX files into a single file, by recursively replacing "
+        "the \\input and \\include commands in the root TeX files with the "
+        "contents of the files they reference; \\include is replaced "
+        "together with its implicit \\clearpage commands. The merged files "
+        "are not copied to the output folder. Note that \\includeonly is "
+        "not supported."
+    ),
+)
+
+PARSER.add_argument(
     "--commands_to_delete",
     nargs="+",
     default=[],
@@ -133,6 +157,21 @@ PARSER.add_argument(
         "argument `input_folder` cannot come immediately after "
         "`environments_to_delete`, as the parser does not have any way to "
         "know if it's another environment to delete."
+    ),
+)
+
+PARSER.add_argument(
+    "--verbatim_environments",
+    nargs="+",
+    default=[],
+    required=False,
+    help=(
+        "LaTeX environments whose content is left alone, comments included, "
+        "on top of verbatim, Verbatim, lstlisting and minted. Useful for "
+        "environments that show code, where a %% is part of the code. Please "
+        "note that the positional argument `input_folder` cannot come "
+        "immediately after `verbatim_environments`, as the parser does not "
+        "have any way to know if it's another environment."
     ),
 )
 
@@ -269,9 +308,14 @@ def parse_arguments(argv=None):
   return final_args
 
 
-if __name__ == '__main__':
+def main():
+  """Run the installed command or module entry point."""
   final_args = parse_arguments()
   logging.basicConfig(
       level=logging.INFO if final_args.get('verbose', False) else logging.ERROR
   )
   run_arxiv_cleaner(final_args)
+
+
+if __name__ == '__main__':
+  main()

@@ -13,9 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from os import path
 import shutil
+import subprocess
+import tempfile
 import unittest
+from unittest import mock
 from absl.testing import parameterized
 from arxiv_latex_cleaner import arxiv_latex_cleaner
 from PIL import Image
@@ -290,8 +294,23 @@ class UnitTests(parameterized.TestCase):
       },
       {
           'testcase_name': 'percent',
-          'line_in': r'100\% accurate\n',
-          'true_output': r'100\% accurate\n',
+          'line_in': r'100\% accurate' + '\n',
+          'true_output': r'100\% accurate' + '\n',
+      },
+      {
+          'testcase_name': 'breakline_with_comment',
+          'line_in': r'\\% comment' + '\n',
+          'true_output': r'\\%' + '\n',
+      },
+      {
+          'testcase_name': 'breakline_with_literal_percent',
+          'line_in': r'\\\% no comment' + '\n',
+          'true_output': r'\\\% no comment' + '\n',
+      },
+      {
+          'testcase_name': 'breakline_with_literal_percent_and_comment',
+          'line_in': r'\\\% no comment\\% comment' + '\n',
+          'true_output': r'\\\% no comment\\%' + '\n',
       },
       {
           'testcase_name': 'comment',
@@ -302,6 +321,11 @@ class UnitTests(parameterized.TestCase):
           'testcase_name': 'comment_inline',
           'line_in': 'Foo %Comment\n',
           'true_output': 'Foo %\n',
+      },
+      {
+          'testcase_name': 'comment_inline_with_tab_and_space',
+          'line_in': '\t %Y\n',
+          'true_output': '',
       },
       {
           'testcase_name': 'url_with_percent',
@@ -317,6 +341,75 @@ class UnitTests(parameterized.TestCase):
   def test_remove_comments_inline(self, line_in, true_output):
     self.assertEqual(
         arxiv_latex_cleaner._remove_comments_inline(line_in), true_output
+    )
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'listing',
+          'text_in': (
+              'Foo % Comment\n'
+              '\\begin{lstlisting}[language=C]\n'
+              'x = 1 % not a comment\n'
+              '  % neither is this\n'
+              '\\end{lstlisting}\n'
+              'Bar % Comment\n'
+          ),
+          'true_output': (
+              'Foo %\n'
+              '\\begin{lstlisting}[language=C]\n'
+              'x = 1 % not a comment\n'
+              '  % neither is this\n'
+              '\\end{lstlisting}\n'
+              'Bar %\n'
+          ),
+      },
+      {
+          'testcase_name': 'starred_verbatim',
+          'text_in': '\\begin{verbatim*}\n50% off\n\\end{verbatim*}\n% Comment\n',
+          'true_output': '\\begin{verbatim*}\n50% off\n\\end{verbatim*}\n',
+      },
+      {
+          'testcase_name': 'text_before_begin_on_the_same_line',
+          'text_in': 'Foo \\begin{minted}{c}\nx % y\n\\end{minted} % Comment\n',
+          'true_output': 'Foo \\begin{minted}{c}\nx % y\n\\end{minted} %\n',
+      },
+      {
+          'testcase_name': 'custom_environment',
+          'text_in': '\\begin{code}\nx % y\n\\end{code}\n',
+          'verbatim_environments': ['code'],
+          'true_output': '\\begin{code}\nx % y\n\\end{code}\n',
+      },
+      {
+          'testcase_name': 'unknown_environment_is_cleaned',
+          'text_in': '\\begin{code}\nx % y\n\\end{code}\n',
+          'true_output': '\\begin{code}\nx %\n\\end{code}\n',
+      },
+      {
+          'testcase_name': 'commented_out_begin',
+          'text_in': '% \\begin{verbatim}\nsecret % c\n\\end{verbatim}\n',
+          'true_output': 'secret %\n\\end{verbatim}\n',
+      },
+      {
+          'testcase_name': 'commented_out_begin_before_a_real_one',
+          'text_in': (
+              '% \\begin{verbatim}\n'
+              '\\begin{verbatim}\n'
+              'x % y\n'
+              '\\end{verbatim}\n'
+              'Foo % Comment\n'
+          ),
+          'true_output': '\\begin{verbatim}\nx % y\n\\end{verbatim}\nFoo %\n',
+      },
+      {
+          'testcase_name': 'escaped_percent_before_begin',
+          'text_in': '100\\% \\begin{verbatim}\nx % y\n\\end{verbatim}\n',
+          'true_output': '100\\% \\begin{verbatim}\nx % y\n\\end{verbatim}\n',
+      },
+  )
+  def test_remove_comments(self, text_in, true_output, verbatim_environments=()):
+    self.assertEqual(
+        arxiv_latex_cleaner._remove_comments(text_in, verbatim_environments),
+        true_output,
     )
 
   @parameterized.named_parameters(
@@ -415,6 +508,42 @@ class UnitTests(parameterized.TestCase):
 
   @parameterized.named_parameters(
       {
+          # '.' would match any character if not escaped, so the similarly
+          # named '\todoX' command would be wrongly removed as well.
+          'testcase_name': 'dot',
+          'command': 'todo.',
+          'kept_command': '\\todoX{B}',
+          'removed_command': '\\todo.{C}',
+      },
+      {
+          # '*' is a quantifier; unescaped, the pattern would not match the
+          # literal command '\star*' at all.
+          'testcase_name': 'star',
+          'command': 'star*',
+          'kept_command': '\\start{B}',
+          'removed_command': '\\star*{C}',
+      },
+      {
+          # '+' is a quantifier; unescaped it changes which text matches.
+          'testcase_name': 'plus',
+          'command': 'foo+',
+          'kept_command': '\\foobar{B}',
+          'removed_command': '\\foo+{C}',
+      },
+  )
+  def test_remove_command_escapes_regex_metacharacters_in_name(
+      self, command, kept_command, removed_command
+  ):
+    # A command name with regex metacharacters must be matched literally. The
+    # similarly named command without the metacharacter must be left untouched,
+    # and the targeted command must be removed.
+    text = 'A ' + kept_command + ' B ' + removed_command + ' C\n'
+    output = arxiv_latex_cleaner._remove_command(text, command, False)
+    self.assertIn(kept_command, output)
+    self.assertNotIn(removed_command, output)
+
+  @parameterized.named_parameters(
+      {
           'testcase_name': 'no_environment',
           'text_in': 'Foo\n',
           'true_output': 'Foo\n',
@@ -457,6 +586,11 @@ class UnitTests(parameterized.TestCase):
           'true_output': '\\ifvar\n\\fi\n',
       },
       {
+          'testcase_name': 'if_removed_with_nested_iftrue',
+          'text_in': '\\iftrue\n\\iftrue Foo\n\\fi\n\\fi\n',
+          'true_output': 'Foo\n',
+      },
+      {
           'testcase_name': 'if_removed_eof',
           'text_in': '\\iffalse\nFoo\n\\fi',
           'true_output': '',
@@ -486,15 +620,35 @@ class UnitTests(parameterized.TestCase):
           'text_in': '\\iftrue expected\\else not expected\\fi',
           'true_output': 'expected',
       },
+      # A common(?) misconception is that `\if0 ... \fi` would remove and 
+      # `\if1 ... fi` would retain the enclosed text.
+      # However, `\if<token1><token2> ... \fi` compares <token1> and <token2>,
+      # and based on that, removes or retains the enclosed text
+      # (see Knuth's texbook, Chapter 20, page 208).
       {
           'testcase_name': 'if0_removed',
-          'text_in': '\\if0 to be removed\\fi',
+          'text_in': r'\if0 to be removed\fi',
           'true_output': '',
       },
       {
-          'testcase_name': 'if1 works',
-          'text_in': '\\if 1 expected\\fi',
-          'true_output': 'expected',
+          'testcase_name': 'if0_retained',
+          'text_in': r'\if00 not to be removed\fi',
+          'true_output': ' not to be removed',
+      },
+      {
+          'testcase_name': 'if00 retains blank line',
+          'text_in': 'test\\if00\n\ntest2\\fi',
+          'true_output': 'test\n\ntest2',
+      },
+      {
+          'testcase_name': 'if1_removed',
+          'text_in': r'\if 1 to be removed\fi',
+          'true_output': '',
+      },
+      {
+          'testcase_name': 'if1_retained',
+          'text_in': r'\if 11 not to be removed\fi',
+          'true_output': ' not to be removed',
       },
       {
           'testcase_name': 'new_if_ignored',
@@ -511,6 +665,31 @@ class UnitTests(parameterized.TestCase):
           'text_in': '\\iftrue\\iff\\else\\fi',
           'true_output': '\\iff',
       },
+      {
+            'testcase_name': 'inline conditional block with and without command',
+            'text_in': 'Inline block\\quad\\iftrue with \\fi and \\iftrue without \\fi command in front.',
+            'true_output': 'Inline block\\quad with and without command in front.'
+      },
+      {
+            'testcase_name': 'does not create new blank lines',
+            'text_in': '\\iffalse hidden \\fi\n',
+            'true_output': ''
+      },
+      {
+            'testcase_name': 'does not remove existing blank lines',
+            'text_in': '\\iffalse hidden \\fi\n\n',
+            'true_output': '\n'
+      },
+      {
+            'testcase_name': 'numbers after \\fi are retained.',
+            'text_in': r'\iffalse x\fi1' + '\n',
+            'true_output': '1\n'
+      },
+      {
+            'testcase_name': 'text after conditional is retained even if no newline occurs',
+            'text_in': r'\iffalse x\fi1',
+            'true_output': '1'
+      }
   )
   def test_simplify_conditional_blocks(self, text_in, true_output):
     self.assertEqual(
@@ -676,6 +855,143 @@ class UnitTests(parameterized.TestCase):
         arxiv_latex_cleaner._replace_includesvg(text_in, figures_in),
         true_output,
     )
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'no_input',
+          'tex_contents': {'main.tex': 'Foo\nFoo2\n'},
+          'true_output': 'Foo\nFoo2\n',
+          'true_merged_files': set(),
+      },
+      {
+          'testcase_name': 'input_with_extension',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{section.tex}\nB\n',
+              'section.tex': 'C\nD\n',
+          },
+          'true_output': 'A\nC\nD\n\nB\n',
+          'true_merged_files': {'section.tex'},
+      },
+      {
+          'testcase_name': 'input_without_extension',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{section}\nB\n',
+              'section.tex': 'C\nD\n',
+          },
+          'true_output': 'A\nC\nD\n\nB\n',
+          'true_merged_files': {'section.tex'},
+      },
+      {
+          'testcase_name': 'input_tikz',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{figures/figure.tikz}\nB\n',
+              'figures/figure.tikz': 'C\n',
+          },
+          'true_output': 'A\nC\n\nB\n',
+          'true_merged_files': {'figures/figure.tikz'},
+      },
+      {
+          'testcase_name': 'input_path_starting_with_dot',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{./figures/section.tex}\nB\n',
+              'figures/section.tex': 'C\n',
+          },
+          'true_output': 'A\nC\n\nB\n',
+          'true_merged_files': {'figures/section.tex'},
+      },
+      {
+          'testcase_name': 'input_recursive',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{section.tex}\nB\n',
+              'section.tex': 'C\n\\input{subsection.tex}\nD\n',
+              'subsection.tex': 'E\n',
+          },
+          'true_output': 'A\nC\nE\n\nD\n\nB\n',
+          'true_merged_files': {'section.tex', 'subsection.tex'},
+      },
+      {
+          'testcase_name': 'input_twice',
+          'tex_contents': {
+              'main.tex': '\\input{table.tex}\n\\input{table.tex}\n',
+              'table.tex': 'C\n',
+          },
+          'true_output': 'C\n\nC\n\n',
+          'true_merged_files': {'table.tex'},
+      },
+      {
+          'testcase_name': 'input_with_comments',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{%\n  section.tex%\n}\nB\n',
+              'section.tex': 'C\n',
+          },
+          'true_output': 'A\nC\n\nB\n',
+          'true_merged_files': {'section.tex'},
+      },
+      {
+          'testcase_name': 'input_with_bom',
+          'tex_contents': {
+              'main.tex': 'A\n\\input{section.tex}\nB\n',
+              'section.tex': '\ufeffC\n',
+          },
+          'true_output': 'A\nC\n\nB\n',
+          'true_merged_files': {'section.tex'},
+      },
+      {
+          'testcase_name': 'include',
+          'tex_contents': {
+              'main.tex': 'A\n\\include{chapter}\nB\n',
+              'chapter.tex': 'C\n',
+          },
+          'true_output': 'A\n\\clearpage{}\nC\n\\clearpage{}\n\nB\n',
+          'true_merged_files': {'chapter.tex'},
+      },
+      {
+          'testcase_name': 'include_recursive_input',
+          'tex_contents': {
+              'main.tex': 'A\n\\include{chapter}\nB\n',
+              'chapter.tex': 'C\n\\input{section.tex}\nD\n',
+              'section.tex': 'E\n',
+          },
+          'true_output': 'A\n\\clearpage{}\nC\nE\n\nD\n\\clearpage{}\n\nB\n',
+          'true_merged_files': {'chapter.tex', 'section.tex'},
+      },
+      {
+          'testcase_name': 'input_not_found_untouched',
+          'tex_contents': {'main.tex': 'A\n\\input{missing.tex}\nB\n'},
+          'true_output': 'A\n\\input{missing.tex}\nB\n',
+          'true_merged_files': set(),
+      },
+      {
+          'testcase_name': 'include_not_found_untouched',
+          'tex_contents': {'main.tex': 'A\n\\include{missing}\nB\n'},
+          'true_output': 'A\n\\include{missing}\nB\n',
+          'true_merged_files': set(),
+      },
+      {
+          'testcase_name': 'input_circular_untouched',
+          'tex_contents': {'main.tex': 'A\n\\input{main.tex}\nB\n'},
+          'true_output': 'A\n\\input{main.tex}\nB\n',
+          'true_merged_files': set(),
+      },
+      {
+          'testcase_name': 'includegraphics_untouched',
+          'tex_contents': {
+              'main.tex': 'A\n\\includegraphics{figures/figure.tikz}\nB\n',
+              'figures/figure.tikz': 'C\n',
+          },
+          'true_output': 'A\n\\includegraphics{figures/figure.tikz}\nB\n',
+          'true_merged_files': set(),
+      },
+  )
+  def test_merge_tex_files(self, tex_contents, true_output, true_merged_files):
+    merged_files = set()
+    self.assertEqual(
+        arxiv_latex_cleaner._merge_tex_files(
+            'main.tex', tex_contents, merged_files
+        ),
+        true_output,
+    )
+    self.assertSetEqual(merged_files, true_merged_files)
 
   @parameterized.named_parameters(*make_search_reference_tests())
   def test_search_reference_weak(
@@ -872,6 +1188,112 @@ class UnitTests(parameterized.TestCase):
       msg = msg_fmt.format(filename, content)
       self.assertEqual(matched, true_output, msg)
 
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'space_and_injected_flags',
+          'origin_folder': 'origin',
+          'destination_folder': 'dest',
+          'filename': 'dir -dNOSAFER -sOutputFile=%pipe%id/fig 1.pdf',
+          'resolution': 300,
+      },
+      {
+          'testcase_name': 'leading_at_and_dash',
+          'origin_folder': '@evil',
+          'destination_folder': '-dest',
+          'filename': '-dNOSAFER.pdf',
+          'resolution': '150',
+      },
+      {
+          'testcase_name': 'percent_format_specifiers',
+          'origin_folder': 'origin',
+          'destination_folder': 'dest',
+          'filename': 'fig_%d_100%.pdf',
+          'resolution': 500,
+      },
+  )
+  def test_resize_pdf_figure_argv_no_injection(
+      self, origin_folder, destination_folder, filename, resolution
+  ):
+    with mock.patch.object(subprocess, 'Popen', autospec=True) as mock_popen:
+      arxiv_latex_cleaner._resize_pdf_figure(
+          filename, origin_folder, destination_folder, resolution
+      )
+
+    expected_input = os.path.abspath(os.path.join(origin_folder, filename))
+    expected_output = os.path.abspath(
+        os.path.join(destination_folder, filename)
+    ).replace('%', '%%')
+    expected_command = [
+        'gs',
+        '-sDEVICE=pdfwrite',
+        '-dCompatibilityLevel=1.4',
+        '-dSAFER',
+        '-dNOPAUSE',
+        '-dQUIET',
+        '-dBATCH',
+        '-dDownsampleColorImages=true',
+        f'-dColorImageResolution={int(resolution)}',
+        '-dColorImageDownsampleThreshold=1.0',
+        '-dAutoRotatePages=/None',
+        f'-sOutputFile={expected_output}',
+        '-f',
+        expected_input,
+    ]
+    mock_popen.assert_called_once_with(expected_command, stdout=subprocess.PIPE)
+
+
+class PdfCompressionTests(unittest.TestCase):
+
+  @unittest.skipIf(shutil.which('gs') is None, 'Ghostscript is not installed.')
+  def test_compress_pdf_prevents_argv_injection(self):
+    with tempfile.TemporaryDirectory() as tmp_dir:
+      canary_file = os.path.join(tmp_dir, 'canary.txt')
+      canary_script = os.path.join(tmp_dir, 'trigger_canary.sh')
+      with open(canary_script, 'w', encoding='utf-8') as f:
+        f.write(f'#!/bin/sh\necho triggered > "{canary_file}"\n')
+      os.chmod(canary_script, 0o755)
+
+      input_dir = os.path.join(tmp_dir, 'proj')
+      crafted_subdir = f'x_%d -dNOSAFER -sOutputFile=%pipe%{canary_script} y'
+      pdf_dir = os.path.join(input_dir, crafted_subdir)
+      os.makedirs(pdf_dir)
+
+      pdf_filename = 'fig 1.pdf'
+      shutil.copy(
+          'test_data/tex/ext_tikz/test1.pdf',
+          os.path.join(pdf_dir, pdf_filename),
+      )
+      with open(
+          os.path.join(input_dir, 'main.tex'), 'w', encoding='utf-8'
+      ) as f:
+        f.write(
+            '\\documentclass{article}\n'
+            '\\begin{document}\n'
+            '\\includegraphics{fig 1}\n'
+            '\\end{document}\n'
+        )
+
+      arxiv_latex_cleaner.run_arxiv_cleaner({
+          'input_folder': input_dir,
+          'images_allowlist': {},
+          'resize_images': False,
+          'im_size': 500,
+          'compress_pdf': True,
+          'pdf_im_resolution': 150,
+          'commands_to_delete': [],
+          'commands_only_to_delete': [],
+          'environments_to_delete': [],
+          'keep_bib': False,
+      })
+
+      self.assertFalse(os.path.exists(canary_file))
+      expected_pdf = os.path.join(
+          f'{input_dir}_arXiv', crafted_subdir, pdf_filename
+      )
+      self.assertTrue(os.path.isfile(expected_pdf))
+      with open(expected_pdf, 'rb') as f:
+        self.assertTrue(f.read(8).startswith(b'%PDF-1.4'))
+
 
 class IntegrationTests(parameterized.TestCase):
 
@@ -995,9 +1417,152 @@ class IntegrationTests(parameterized.TestCase):
             path.join(self.out_path, f1), path.join(out_path_true, f1)
         )
 
+  @parameterized.named_parameters(
+      {'testcase_name': 'from_dir', 'input_dir': 'test_data/tex'},
+      {'testcase_name': 'from_zip', 'input_dir': 'test_data/tex.zip'},
+  )
+  def test_merge_tex_files(self, input_dir):
+    out_path_true = 'test_data/tex_arXiv_true'
+    merged_files_true = [
+        'figures/figure_included.tex',
+        'figures/figure_included.tikz',
+    ]
+
+    # Make sure the folder does not exist, since we erase it in the test.
+    if path.isdir(self.out_path):
+      raise RuntimeError(
+          'The folder {:s} should not exist.'.format(self.out_path)
+      )
+
+    arxiv_latex_cleaner.run_arxiv_cleaner({
+        'input_folder': input_dir,
+        'images_allowlist': {
+            'images/im2_included.jpg': 200,
+            'images/im3_included.png': 400,
+        },
+        'resize_images': True,
+        'im_size': 100,
+        'compress_pdf': False,
+        'pdf_im_resolution': 500,
+        'commands_to_delete': ['mytodo'],
+        'commands_only_to_delete': ['red'],
+        'if_exceptions': ['iffalt'],
+        'environments_to_delete': ['mynote'],
+        'use_external_tikz': 'ext_tikz',
+        'keep_bib': False,
+        'merge_tex_files': True,
+    })
+
+    # Checks the merged files are not copied to the output folder, and that the
+    # set of files is otherwise the same as without merging.
+    out_files = set(arxiv_latex_cleaner._list_all_files(self.out_path))
+    out_files_true = set(
+        arxiv_latex_cleaner._list_all_files(out_path_true)
+    ) - set(merged_files_true)
+    self.assertSetEqual(out_files, out_files_true)
+
+    # Compares the contents of each file but the root file against the true
+    # value.
+    for f1 in out_files:
+      if f1 != 'main.tex':
+        self._compare_files(
+            path.join(self.out_path, f1), path.join(out_path_true, f1)
+        )
+
+    # Checks the root file contains the contents of the merged files, and no
+    # \input commands anymore.
+    with open(path.join(self.out_path, 'main.tex'), encoding='utf-8') as f:
+      main_content = f.read()
+    self.assertNotIn('\\input{', main_content)
+    self.assertNotIn('\\include{', main_content)
+    for merged_file in merged_files_true:
+      with open(path.join(out_path_true, merged_file), encoding='utf-8') as f:
+        # The BOM at the beginning of a file is stripped when it is merged.
+        merged_content_true = f.read().removeprefix('\ufeff')
+      self.assertIn(merged_content_true, main_content)
+
   def tearDown(self):
     shutil.rmtree(self.out_path)
     super(IntegrationTests, self).tearDown()
+
+
+class AgentFileTests(parameterized.TestCase):
+  """Checks that AI coding agent config files are stripped from the output."""
+
+  # A representative sample of files created by AI coding agents that should
+  # never leak into an arXiv source bundle.
+  AGENT_FILES = [
+      'CLAUDE.md',
+      'CLAUDE.local.md',
+      'AGENTS.md',
+      'AGENT.md',
+      'GEMINI.md',
+      'WARP.md',
+      '.cursorrules',
+      '.windsurfrules',
+      '.mcp.json',
+      '.claude/settings.json',
+      '.claude/commands/foo.md',
+      '.cursor/rules/style.mdc',
+      '.gemini/settings.json',
+      '.codex/config.toml',
+      '.aider.chat.history.md',
+      '.github/copilot-instructions.md',
+  ]
+
+  def setUp(self):
+    super(AgentFileTests, self).setUp()
+    self.in_path = tempfile.mkdtemp()
+    self.out_path = self.in_path + '_arXiv'
+
+  def _populate_input(self):
+    # A minimal but valid paper that references nothing external.
+    with open(path.join(self.in_path, 'main.tex'), 'w') as f:
+      f.write('\\documentclass{article}\n\\begin{document}\nHi.\n'
+              '\\end{document}\n')
+    for rel_path in self.AGENT_FILES:
+      full_path = path.join(self.in_path, rel_path)
+      arxiv_latex_cleaner._create_dir_if_not_exists(path.dirname(full_path))
+      with open(full_path, 'w') as f:
+        f.write('agent instructions\n')
+
+  def _run(self, keep_agent_files):
+    arxiv_latex_cleaner.run_arxiv_cleaner({
+        'input_folder': self.in_path,
+        'images_allowlist': {},
+        'resize_images': False,
+        'im_size': 500,
+        'compress_pdf': False,
+        'pdf_im_resolution': 500,
+        'commands_to_delete': [],
+        'keep_bib': False,
+        'keep_agent_files': keep_agent_files,
+    })
+    return set(arxiv_latex_cleaner._list_all_files(self.out_path))
+
+  def test_agent_files_are_removed_by_default(self):
+    self._populate_input()
+    out_files = self._run(keep_agent_files=False)
+    self.assertIn('main.tex', out_files)
+    for rel_path in self.AGENT_FILES:
+      self.assertNotIn(
+          rel_path,
+          out_files,
+          '{:s} should have been removed.'.format(rel_path),
+      )
+
+  def test_agent_files_are_kept_with_flag(self):
+    self._populate_input()
+    out_files = self._run(keep_agent_files=True)
+    # Root-level files are always copied; with the opt-out they must survive.
+    self.assertIn('CLAUDE.md', out_files)
+    self.assertIn('AGENTS.md', out_files)
+
+  def tearDown(self):
+    shutil.rmtree(self.in_path, ignore_errors=True)
+    shutil.rmtree(self.out_path, ignore_errors=True)
+    super(AgentFileTests, self).tearDown()
+
 
 if __name__ == '__main__':
   unittest.main()
